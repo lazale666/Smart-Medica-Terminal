@@ -13,6 +13,7 @@ SOURCES += \
     loginwidget.cpp \
     main.cpp \
     mainwindow.cpp \
+    settingswidget.cpp \
     speech.cpp \
     widget.cpp
 
@@ -22,6 +23,7 @@ HEADERS += \
     http.h \
     loginwidget.h \
     mainwindow.h \
+    settingswidget.h \
     speech.h \
     widget.h
 
@@ -29,6 +31,7 @@ FORMS += \
     dialog.ui \
     loginwidget.ui \
     mainwindow.ui \
+    settingswidget.ui \
     widget.ui
 
 # Default rules for deployment.

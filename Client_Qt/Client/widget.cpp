@@ -3,6 +3,10 @@
 #include <QDir>
 #include <QTextStream>
 #include <QDateTime>
+#include <QListWidgetItem>
+#include <QStringConverter>
+#include <QSettings>
+#include <QFont>
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
@@ -16,13 +20,32 @@ Widget::Widget(QWidget *parent)
     dia = new Dialog(this);
     audio = new Audio(this);
     speech = new Speech();
+    settingsWidget = nullptr;
     msg->close();
-    connect(socket,&QTcpSocket::connected,this,&Widget::connectService);
-    connect(socket,&QTcpSocket::disconnected,this,&Widget::disConnectService);
-    connect(socket,&QTcpSocket::errorOccurred,this,&Widget::connectError);
-    connect(timer,&QTimer::timeout,this,&Widget::reconnect);
-    connect(historyTimer,&QTimer::timeout,this,&Widget::onHistoryLoadTimerTick);
-    connect(this,&Widget::sendInfo,dia,&Dialog::reConnectInfo);
+
+    m_settings = new QSettings("SmartMedica", "Client", this);
+
+    m_username = "用户";
+    m_isNewSession = true;
+    m_autoConnect = true;
+    m_currentMode = "普通模式";
+    m_fontColor = "#000000";
+
+    connect(socket, &QTcpSocket::connected, this, &Widget::connectService);
+    connect(socket, &QTcpSocket::disconnected, this, &Widget::disConnectService);
+    connect(socket, &QTcpSocket::errorOccurred, this, &Widget::connectError);
+    connect(timer, &QTimer::timeout, this, &Widget::reconnect);
+    connect(historyTimer, &QTimer::timeout, this, &Widget::onHistoryLoadTimerTick);
+    connect(this, &Widget::sendInfo, dia, &Dialog::reConnectInfo);
+    connect(ui->historyList, &QListWidget::itemClicked, this, &Widget::onHistoryItemClicked);
+
+    connect(ui->newChatBtn, &QPushButton::clicked, this, [=]() {
+        createNewChat();
+    });
+
+    connect(ui->settingsBtn, &QPushButton::clicked, this, &Widget::onSettingsBtnClicked);
+    connect(ui->readBtn, &QPushButton::clicked, this, &Widget::onReadBtnClicked);
+
     conFlag = 0;
     errFlag = 0;
     count = 0;
@@ -30,17 +53,16 @@ Widget::Widget(QWidget *parent)
     m_isThinking = false;
     m_isInterrupted = false;
 
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString historyDir = appDir + "/chat_history";
-    QDir dir;
-    if(!dir.exists(historyDir))
-    {
-        dir.mkpath(historyDir);
-    }
-    m_chatHistoryFile = historyDir + "/chat.txt";
-
-    ui->historyProgressBar->setVisible(false);
+    ui->chatTitleLabel->setVisible(true);
     ui->pushButton->setText("发送");
+
+    loadSettings();
+
+    ui->textBrowser->append("✅ 已进入聊天界面");
+    ui->textBrowser->append("提示：可在设置中配置服务器并手动连接");
+
+    createNewChat();
+    refreshHistoryList();
 }
 
 Widget::~Widget()
@@ -48,18 +70,165 @@ Widget::~Widget()
     delete ui;
 }
 
+void Widget::loadSettings()
+{
+    serverIP = m_settings->value("serverIP", "127.0.0.1").toString();
+    serverPort = m_settings->value("serverPort", 9999).toUInt();
+    m_autoConnect = m_settings->value("autoConnect", true).toBool();
+    m_currentMode = m_settings->value("mode", "普通模式").toString();
+    m_fontColor = m_settings->value("fontColor", "#000000").toString();
+
+    applyModeSettings(m_currentMode);
+    applyFontColor(m_fontColor);
+}
+
+void Widget::setUsername(const QString &username)
+{
+    m_username = username;
+    ui->userLabel->setText(username);
+}
+
+void Widget::applyModeSettings(const QString &mode)
+{
+    m_currentMode = mode;
+    QFont font = ui->textBrowser->font();
+    QFont labelFont = ui->userLabel->font();
+    QFont btnFont = ui->pushButton->font();
+    QFont lineFont = ui->lineEdit->font();
+
+    if (mode == "关怀模式") {
+        font.setPointSize(font.pointSize() * 1.5);
+        labelFont.setPointSize(labelFont.pointSize() * 1.5);
+        btnFont.setPointSize(btnFont.pointSize() * 1.5);
+        lineFont.setPointSize(lineFont.pointSize() * 1.5);
+
+        ui->textBrowser->setFont(font);
+        ui->userLabel->setFont(labelFont);
+        ui->pushButton->setFont(btnFont);
+        ui->lineEdit->setFont(lineFont);
+        ui->voiceBtn->setFont(btnFont);
+        ui->newChatBtn->setFont(btnFont);
+        ui->settingsBtn->setFont(btnFont);
+        ui->readBtn->setFont(btnFont);
+        ui->chatTitleLabel->setFont(font);
+        ui->historyTitle->setFont(labelFont);
+        ui->historyList->setFont(font);
+        ui->voiceLabel->setFont(labelFont);
+    } else {
+        font.setPointSize(10);
+        labelFont.setPointSize(10);
+        btnFont.setPointSize(10);
+        lineFont.setPointSize(10);
+
+        ui->textBrowser->setFont(font);
+        ui->userLabel->setFont(labelFont);
+        ui->pushButton->setFont(btnFont);
+        ui->lineEdit->setFont(lineFont);
+        ui->voiceBtn->setFont(btnFont);
+        ui->newChatBtn->setFont(btnFont);
+        ui->settingsBtn->setFont(btnFont);
+        ui->readBtn->setFont(btnFont);
+        ui->chatTitleLabel->setFont(font);
+        ui->historyTitle->setFont(labelFont);
+        ui->historyList->setFont(font);
+        ui->voiceLabel->setFont(labelFont);
+    }
+}
+
+void Widget::applyFontColor(const QString &color)
+{
+    m_fontColor = color;
+    ui->textBrowser->setStyleSheet(QString("color: %1;").arg(color));
+    ui->lineEdit->setStyleSheet(QString("color: %1;").arg(color));
+}
+
+void Widget::connectToServer()
+{
+    if (socket->state() == QTcpSocket::ConnectedState) {
+        socket->disconnectFromHost();
+    }
+    ui->textBrowser->append(QString("🔌 正在连接服务器 %1:%2...").arg(serverIP).arg(serverPort));
+    socket->connectToHost(serverIP, serverPort);
+    conFlag = 1;
+}
+
+QString Widget::getHistoryDir()
+{
+    QString appDir = QCoreApplication::applicationDirPath();
+    QString historyDir = appDir + "/chat_history";
+    QDir dir;
+    if (!dir.exists(historyDir)) {
+        dir.mkpath(historyDir);
+    }
+    return historyDir;
+}
+
+void Widget::createNewChat()
+{
+    ui->textBrowser->clear();
+    m_isNewSession = true;
+    m_firstMessage.clear();
+
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
+
+    ui->textBrowser->append("✅ 已开启新对话");
+    applyFontColor(m_fontColor);
+}
+
+void Widget::refreshHistoryList()
+{
+    ui->historyList->clear();
+    QDir dir(getHistoryDir());
+    QStringList filters;
+    filters << "chat_*.txt";
+    dir.setNameFilters(filters);
+    QFileInfoList fileList = dir.entryInfoList(QDir::Files, QDir::Time | QDir::Reversed);
+
+    for (const QFileInfo &fileInfo : fileList) {
+        QFile file(fileInfo.absoluteFilePath());
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            in.setEncoding(QStringConverter::Utf8);
+            QString firstLine = in.readLine();
+            file.close();
+
+            if (!firstLine.isEmpty()) {
+                QStringList parts = firstLine.split("|");
+                QString displayText;
+                if (parts.size() >= 3 && parts[1] == "我") {
+                    displayText = parts[2].left(20);
+                    if (parts[2].length() > 20) displayText += "...";
+                } else {
+                    displayText = "新对话";
+                }
+                QListWidgetItem *item = new QListWidgetItem(displayText);
+                item->setData(Qt::UserRole, fileInfo.fileName());
+                ui->historyList->addItem(item);
+            }
+        }
+    }
+}
+
+void Widget::onHistoryItemClicked(QListWidgetItem *item)
+{
+    QString fileName = item->data(Qt::UserRole).toString();
+    m_currentChatFile = getHistoryDir() + "/" + fileName;
+    m_isNewSession = false;
+    ui->textBrowser->clear();
+    loadChatHistory(fileName);
+    applyFontColor(m_fontColor);
+}
+
 void Widget::connectService()
 {
-    ui->pushButton_2->setText("断开连接");
-    ui->textBrowser->clear();
-    ui->textBrowser->append("已连接服务器");
-    ui->statusLabel->setText("状态：已连接");
-    connect(socket,&QTcpSocket::readyRead,this,&Widget::readData);
+    ui->textBrowser->append("✅ 已连接服务器");
+    connect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
 
-    ui->historyProgressBar->setValue(0);
-    ui->historyProgressBar->setVisible(true);
-    ui->textBrowser->append("正在读取历史聊天记录...");
-    historyTimer->start(30);
+    if (!m_currentChatFile.isEmpty()) {
+        QFileInfo fi(m_currentChatFile);
+        loadChatHistory(fi.fileName());
+    }
 }
 
 void Widget::readData()
@@ -67,38 +236,32 @@ void Widget::readData()
     buffer.append(socket->readAll());
 
     while (true) {
-        if (buffer.size() < 4) {
-            break;
-        }
+        if (buffer.size() < 4) break;
 
         quint32 dataLen = qFromBigEndian<quint32>(reinterpret_cast<uchar*>(buffer.data()));
         qint32 totalLen = 4 + dataLen;
 
-        if (buffer.size() < totalLen) {
-            break;
-        }
+        if (buffer.size() < totalLen) break;
 
         QByteArray jsonData = buffer.mid(4, dataLen);
         buffer = buffer.mid(totalLen);
 
         QJsonParseError parseErr;
         QJsonDocument docu = QJsonDocument::fromJson(jsonData, &parseErr);
-        if(parseErr.error == QJsonParseError::NoError) {
+        if (parseErr.error == QJsonParseError::NoError) {
             QJsonObject obj = docu.object();
             QString type = obj.value("type").toString();
             QJsonValue value;
 
-            if (type == "ai_response") {
+            if (type == "ai_response")
                 value = obj.value("data");
-            } else if (type == "message") {
+            else if (type == "message")
                 value = obj.value("message");
-            }
 
-            if(value.isString()) {
+            if (value.isString()) {
                 QString content = value.toString();
 
-                if(m_isInterrupted)
-                {
+                if (m_isInterrupted) {
                     m_isThinking = false;
                     m_isInterrupted = false;
                     ui->textBrowser->append("已中断");
@@ -108,7 +271,7 @@ void Widget::readData()
 
                 m_isThinking = false;
                 ui->pushButton->setText("发送");
-                ui->textBrowser->append("茯苓：" + content);
+                ui->textBrowser->append("🤖 茯苓：" + content);
                 saveChatMessage("茯苓", content);
             }
         }
@@ -117,10 +280,9 @@ void Widget::readData()
 
 void Widget::disConnectService()
 {
-    ui->pushButton_2->setText("链接服务器");
-    disconnect(socket,&QTcpSocket::readyRead,this,&Widget::readData);
+    disconnect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
     conFlag = 0;
-    ui->statusLabel->setText("状态：已断开");
+    ui->textBrowser->append("❌ 已断开服务器");
     m_isThinking = false;
     m_isInterrupted = false;
     ui->pushButton->setText("发送");
@@ -128,25 +290,18 @@ void Widget::disConnectService()
 
 void Widget::connectError(QAbstractSocket::SocketError err)
 {
-    if(!errFlag)
-    {
-        int btn = QMessageBox::warning(this,"网络错误","服务器错误:"+QString::number(err),QMessageBox::Ok|QMessageBox::Close);
-        if(btn==QMessageBox::Ok)
-        {
-            if(conFlag)
-            {
+    if (!errFlag) {
+        int btn = QMessageBox::warning(this, "网络错误", "服务器错误:" + QString::number(err), QMessageBox::Ok | QMessageBox::Close);
+        if (btn == QMessageBox::Ok) {
+            if (conFlag) {
                 errFlag = 1;
                 timer->start(1000);
-                while(!dia->exec());
+                while (!dia->exec());
             }
-        }
-        else
-        {
+        } else {
             this->close();
         }
-    }
-    else
-    {
+    } else {
         emit sendInfo(count);
     }
 }
@@ -154,39 +309,31 @@ void Widget::connectError(QAbstractSocket::SocketError err)
 void Widget::reconnect()
 {
     count++;
-    socket->connectToHost(ui->lineEdit_2->text(),ui->lineEdit_3->text().toInt());
-}
-
-void Widget::on_pushButton_2_clicked()
-{
-    if(ui->pushButton_2->text()=="链接服务器")
-    {
-        socket->connectToHost(ui->lineEdit_2->text(),ui->lineEdit_3->text().toInt());
-        conFlag = 1;
-        ui->statusLabel->setText("状态：连接中...");
-    }
-    else
-    {
-        socket->disconnectFromHost();
-    }
+    socket->connectToHost(serverIP, serverPort);
 }
 
 void Widget::on_pushButton_clicked()
 {
-    if(m_isThinking)
-    {
+    if (m_isThinking) {
         m_isInterrupted = true;
         return;
     }
 
+    QString message = ui->lineEdit->text().trimmed();
+    if (message.isEmpty()) return;
+
+    ui->textBrowser->append("👤 我：" + message);
+    saveChatMessage("我", message);
+
+    if (m_isNewSession && m_firstMessage.isEmpty()) {
+        m_firstMessage = message;
+        m_isNewSession = false;
+        refreshHistoryList();
+    }
+
     QJsonObject obj;
     obj["type"] = "message";
-    QString message = ui->lineEdit->text().trimmed();
-    if(message.isEmpty()) return;
     obj["data"] = message;
-    ui->textBrowser->append("我：" + message);
-    saveChatMessage("我", message);
-    m_pendingUserMessage = message;
 
     QByteArray jsonData = QJsonDocument(obj).toJson(QJsonDocument::Compact);
     QByteArray packet;
@@ -194,11 +341,12 @@ void Widget::on_pushButton_clicked()
     stream.setByteOrder(QDataStream::BigEndian);
     stream << (quint32)jsonData.size();
     packet.append(jsonData);
+
     socket->write(packet);
     socket->flush();
     ui->lineEdit->clear();
 
-    ui->textBrowser->append("思考中...");
+    ui->textBrowser->append("⌛ 思考中...");
     ui->pushButton->setText("中断");
     m_isThinking = true;
     m_isInterrupted = false;
@@ -215,97 +363,208 @@ void Widget::on_voiceBtn_pressed()
 
 void Widget::on_voiceBtn_released()
 {
-    if(isRecording)
-    {
-        isRecording = false;
-        audio->stopAudioRecord();
-        ui->voiceBtn->setText("🎤");
-        ui->voiceLabel->setText("按住说话，松开发送");
-        ui->textBrowser->append("录音结束，正在识别...");
+    if (!isRecording) return;
 
-        QString recognizedText = speech->speechIdentify("record.wav");
+    isRecording = false;
+    audio->stopAudioRecord();
+    ui->voiceBtn->setText("🎤");
+    ui->voiceLabel->setText("按住说话，松开发送");
+    ui->textBrowser->append("识别中...");
 
-        if(!recognizedText.isEmpty())
-        {
-            ui->textBrowser->append("识别结果：" + recognizedText);
+    QString recognizedText = speech->speechIdentify("record.wav");
+    if (!recognizedText.isEmpty()) {
+        ui->textBrowser->append("👤 我：" + recognizedText);
+        saveChatMessage("我", recognizedText);
 
-            QJsonObject obj;
-            obj["type"] = "message";
-            obj["data"] = recognizedText;
-
-            QByteArray jsonData = QJsonDocument(obj).toJson(QJsonDocument::Compact);
-            QByteArray packet;
-            QDataStream stream(&packet, QIODevice::WriteOnly);
-            stream.setByteOrder(QDataStream::BigEndian);
-            stream << (quint32)jsonData.size();
-            packet.append(jsonData);
-            socket->write(packet);
-            socket->flush();
-
-            ui->textBrowser->append("我：" + recognizedText);
-            saveChatMessage("我", recognizedText);
-
-            ui->textBrowser->append("思考中...");
-            ui->pushButton->setText("中断");
-            m_isThinking = true;
-            m_isInterrupted = false;
+        if (m_isNewSession && m_firstMessage.isEmpty()) {
+            m_firstMessage = recognizedText;
+            m_isNewSession = false;
+            refreshHistoryList();
         }
-        else
-        {
-            ui->textBrowser->append("识别失败，请重试");
-        }
+
+        QJsonObject obj;
+        obj["type"] = "message";
+        obj["data"] = recognizedText;
+        QByteArray jsonData = QJsonDocument(obj).toJson(QJsonDocument::Compact);
+        QByteArray packet;
+        QDataStream stream(&packet, QIODevice::WriteOnly);
+        stream.setByteOrder(QDataStream::BigEndian);
+        stream << (quint32)jsonData.size();
+        packet.append(jsonData);
+        socket->write(packet);
+        socket->flush();
+
+        ui->textBrowser->append("⌛ 思考中...");
+        ui->pushButton->setText("中断");
+        m_isThinking = true;
+        m_isInterrupted = false;
+    } else {
+        ui->textBrowser->append("识别失败");
     }
 }
 
 void Widget::onHistoryLoadTimerTick()
 {
-    int currentValue = ui->historyProgressBar->value();
-    if(currentValue < 100)
-    {
-        ui->historyProgressBar->setValue(currentValue + 1);
-    }
-    else
-    {
+    static int cnt = 0;
+    cnt++;
+    if (cnt > 100) {
         historyTimer->stop();
-        loadChatHistory();
-        ui->historyProgressBar->setVisible(false);
+        cnt = 0;
     }
 }
 
 void Widget::saveChatMessage(const QString &role, const QString &content)
 {
-    QFile file(m_chatHistoryFile);
-    if(file.open(QIODevice::Append | QIODevice::Text))
-    {
+    QFile file(m_currentChatFile);
+    if (file.open(QIODevice::Append | QIODevice::Text)) {
         QTextStream out(&file);
-        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-        out << timestamp << "|" << role << "|" << content << "\n";
+        out.setEncoding(QStringConverter::Utf8);
+        QString time = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+        QString escapedContent = content;
+        escapedContent.replace("\\", "\\\\");
+        escapedContent.replace("\n", "\\n");
+        out << time << "|" << role << "|" << escapedContent << "\n";
         file.close();
     }
 }
 
-void Widget::loadChatHistory()
+void Widget::loadChatHistory(const QString &fileName)
 {
-    QFile file(m_chatHistoryFile);
-    if(file.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        QTextStream in(&file);
-        ui->textBrowser->append("--- 历史聊天记录 ---");
-        while(!in.atEnd())
-        {
-            QString line = in.readLine().trimmed();
-            if(!line.isEmpty())
-            {
-                QStringList parts = line.split("|");
-                if(parts.size() >= 3)
-                {
-                    QString role = parts[1];
-                    QString content = parts[2];
-                    ui->textBrowser->append(role + "：" + content);
-                }
-            }
+    QString fullPath = getHistoryDir() + "/" + fileName;
+    QFile file(fullPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+
+    ui->textBrowser->append("------------------- 历史对话 -------------------");
+    QTextStream in(&file);
+    in.setEncoding(QStringConverter::Utf8);
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+        QStringList parts = line.split("|");
+        if (parts.size() >= 3) {
+            QString role = parts[1];
+            QString content = parts[2];
+            content.replace("\\n", "\n");
+            content.replace("\\\\", "\\");
+            if (role == "我")
+                ui->textBrowser->append("👤 我：" + content);
+            else
+                ui->textBrowser->append("🤖 茯苓：" + content);
         }
-        ui->textBrowser->append("--- 历史记录结束 ---");
-        file.close();
     }
+    ui->textBrowser->append("--------------------------------------------------");
+    file.close();
+}
+
+void Widget::onSettingsBtnClicked()
+{
+    if (!settingsWidget) {
+        settingsWidget = new SettingsWidget(nullptr);
+        settingsWidget->setWindowModality(Qt::NonModal);
+        settingsWidget->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+        settingsWidget->setUsername(m_username);
+        settingsWidget->setServerConfig(serverIP, serverPort, m_autoConnect);
+        settingsWidget->setCurrentMode(m_currentMode);
+        settingsWidget->setFontColor(m_fontColor);
+
+        connect(settingsWidget, &SettingsWidget::logout, this, &Widget::onLogout);
+        connect(settingsWidget, &SettingsWidget::modeChanged, this, &Widget::onModeChanged);
+        connect(settingsWidget, &SettingsWidget::fontColorChanged, this, &Widget::onFontColorChanged);
+        connect(settingsWidget, &SettingsWidget::serverConfigChanged, this, &Widget::onServerConfigChanged);
+        connect(settingsWidget, &SettingsWidget::closeSettings, this, &Widget::onCloseSettings);
+        connect(settingsWidget, &SettingsWidget::cacheCleared, this, &Widget::onCacheCleared);
+        connect(settingsWidget, &SettingsWidget::destroyed, this, [=]() {
+            settingsWidget = nullptr;
+        });
+    }
+    settingsWidget->show();
+    settingsWidget->raise();
+    settingsWidget->activateWindow();
+}
+
+void Widget::onLogout()
+{
+    if (settingsWidget) {
+        settingsWidget->close();
+        delete settingsWidget;
+        settingsWidget = nullptr;
+    }
+    emit logout();
+}
+
+void Widget::onModeChanged(const QString &mode)
+{
+    applyModeSettings(mode);
+    refreshHistoryList();
+}
+
+void Widget::onFontColorChanged(const QString &color)
+{
+    applyFontColor(color);
+}
+
+void Widget::onServerConfigChanged(const QString &ip, quint16 port, bool autoConnect)
+{
+    serverIP = ip;
+    serverPort = port;
+    m_autoConnect = autoConnect;
+
+    if (autoConnect) {
+        connectToServer();
+    }
+}
+
+void Widget::onCloseSettings()
+{
+    if (settingsWidget) {
+        settingsWidget->close();
+        delete settingsWidget;
+        settingsWidget = nullptr;
+    }
+}
+
+void Widget::onReadBtnClicked()
+{
+    QString text = ui->textBrowser->toPlainText();
+    if (text.isEmpty()) {
+        QMessageBox::information(this, "提示", "没有可朗读的内容");
+        return;
+    }
+
+    ui->textBrowser->append("🔊 正在朗读...");
+
+    QString lastMessage = "";
+    QStringList lines = text.split("\n");
+    for (int i = lines.size() - 1; i >= 0; i--) {
+        QString line = lines[i].trimmed();
+        if (line.startsWith("🤖 茯苓：")) {
+            lastMessage = line.mid(5);
+            break;
+        }
+    }
+
+    if (lastMessage.isEmpty()) {
+        lastMessage = text.right(200);
+    }
+
+    ui->readBtn->setText("⏹️ 停止");
+    QApplication::processEvents();
+
+    if (speech->textToSpeech(lastMessage, "tts.wav")) {
+        speech->playAudio("tts.wav");
+    }
+
+    ui->readBtn->setText("🔊 朗读");
+}
+
+void Widget::onCacheCleared()
+{
+    ui->textBrowser->clear();
+    ui->textBrowser->append("✅ 已开启新对话");
+    m_isNewSession = true;
+    m_firstMessage.clear();
+
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
+
+    refreshHistoryList();
 }

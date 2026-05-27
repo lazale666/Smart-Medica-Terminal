@@ -4,6 +4,23 @@
 
 Speech::Speech() : playerProcess(nullptr) {}
 
+Speech::~Speech() {
+    stopAudio();
+}
+
+void Speech::stopAudio() {
+    if (playerProcess) {
+        playerProcess->kill();
+        playerProcess->waitForFinished(1000);
+        playerProcess->deleteLater();
+        playerProcess = nullptr;
+    }
+}
+
+bool Speech::isPlaying() const {
+    return playerProcess && playerProcess->state() == QProcess::Running;
+}
+
 QString Speech::getAccessToken()
 {
     if (!accessToken.isEmpty()) {

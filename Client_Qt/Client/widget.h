@@ -28,8 +28,10 @@ public:
     ~Widget();
 
     void setUsername(const QString &username);
+    void setServerInfo(const QString &ip, int port, bool autoConnect);
     void applyModeSettings(const QString &mode);
     void applyFontColor(const QString &color);
+    void applyBgColor(const QString &color);
     void connectToServer();
 
 private slots:
@@ -43,21 +45,33 @@ private slots:
     void on_voiceBtn_pressed();
     void on_voiceBtn_released();
     void onHistoryItemClicked(QListWidgetItem *item);
-    void onSettingsBtnClicked();
     void onLogout();
     void onModeChanged(const QString &mode);
     void onFontColorChanged(const QString &color);
-    void onServerConfigChanged(const QString &ip, quint16 port, bool autoConnect);
-    void onCloseSettings();
-    void onReadBtnClicked();
+    void onBgColorChanged(const QString &color);
     void onCacheCleared();
+    void onReadBtnClicked();
+    void onSettingsBtnClicked();
+    void onCloseSettings();
+    void onServerConfigChanged(const QString &ip, quint16 port, bool autoConnect);
+    void onLogoutFromSettings();
 
 signals:
-    void sendInfo(int cnt);
-    void logout();
+    void backToMenu();
+    void sendInfo(int count);
+
+private:
+    void loadSettings();
+    void saveSettings();
+    void createNewChat();
+    void saveChatMessage(const QString &role, const QString &content);
+    void loadChatHistory(const QString &fileName);
+    void refreshHistoryList();
+    QString getHistoryDir() const;
 
 private:
     Ui::Widget *ui;
+    SettingsWidget *settingsWidget;
     QTcpSocket *socket;
     QTimer *timer;
     QTimer *historyTimer;
@@ -65,27 +79,20 @@ private:
     Dialog *dia;
     Audio *audio;
     Speech *speech;
-    SettingsWidget *settingsWidget;
     QByteArray buffer;
     QString m_currentChatFile;
     QString m_username;
-    QString serverIP;
-    quint16 serverPort;
+    QString m_serverIP;
+    int m_serverPort;
     bool m_autoConnect;
     QString m_currentMode;
     QString m_fontColor;
+    QString m_bgColor;
     QSettings *m_settings;
     int conFlag, errFlag, count;
     bool isRecording, m_isThinking, m_isInterrupted;
     bool m_isNewSession;
     QString m_firstMessage;
-
-    void saveChatMessage(const QString &role, const QString &content);
-    void loadChatHistory(const QString &fileName);
-    void createNewChat();
-    void refreshHistoryList();
-    QString getHistoryDir();
-    void loadSettings();
 };
 
 #endif // WIDGET_H

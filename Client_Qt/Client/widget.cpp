@@ -20,7 +20,6 @@ Widget::Widget(QWidget *parent)
     dia = new Dialog(this);
     audio = new Audio(this);
     speech = new Speech();
-    settingsWidget = nullptr;
     msg->close();
 
     m_settings = new QSettings("SmartMedica", "Client", this);
@@ -30,15 +29,16 @@ Widget::Widget(QWidget *parent)
     m_autoConnect = true;
     m_currentMode = "普通模式";
     m_fontColor = "#000000";
+    m_bgColor = "#ffffff";
 
     connect(socket, &QTcpSocket::connected, this, &Widget::connectService);
     connect(socket, &QTcpSocket::disconnected, this, &Widget::disConnectService);
     connect(socket, &QTcpSocket::errorOccurred, this, &Widget::connectError);
     connect(timer, &QTimer::timeout, this, &Widget::reconnect);
     connect(historyTimer, &QTimer::timeout, this, &Widget::onHistoryLoadTimerTick);
-    connect(this, &Widget::sendInfo, dia, &Dialog::reConnectInfo);
     connect(ui->historyList, &QListWidget::itemClicked, this, &Widget::onHistoryItemClicked);
 
+    connect(ui->backBtn, &QPushButton::clicked, this, &Widget::onLogout);
     connect(ui->newChatBtn, &QPushButton::clicked, this, [=]() {
         createNewChat();
     });
@@ -72,13 +72,15 @@ Widget::~Widget()
 
 void Widget::loadSettings()
 {
-    serverIP = m_settings->value("serverIP", "127.0.0.1").toString();
-    serverPort = m_settings->value("serverPort", 9999).toUInt();
+    m_serverIP = m_settings->value("serverIP", "127.0.0.1").toString();
+    m_serverPort = m_settings->value("serverPort", 9999).toUInt();
     m_autoConnect = m_settings->value("autoConnect", true).toBool();
     m_currentMode = m_settings->value("mode", "普通模式").toString();
     m_fontColor = m_settings->value("fontColor", "#000000").toString();
+    m_bgColor = m_settings->value("bgColor", "#ffffff").toString();
 
     applyModeSettings(m_currentMode);
+    applyBgColor(m_bgColor);
     applyFontColor(m_fontColor);
 }
 
@@ -86,6 +88,17 @@ void Widget::setUsername(const QString &username)
 {
     m_username = username;
     ui->userLabel->setText(username);
+}
+
+void Widget::setServerInfo(const QString &ip, int port, bool autoConnect)
+{
+    m_serverIP = ip;
+    m_serverPort = port;
+    m_autoConnect = autoConnect;
+
+    if (autoConnect) {
+        connectToServer();
+    }
 }
 
 void Widget::applyModeSettings(const QString &mode)
@@ -111,7 +124,6 @@ void Widget::applyModeSettings(const QString &mode)
         ui->settingsBtn->setFont(btnFont);
         ui->readBtn->setFont(btnFont);
         ui->chatTitleLabel->setFont(font);
-        ui->historyTitle->setFont(labelFont);
         ui->historyList->setFont(font);
         ui->voiceLabel->setFont(labelFont);
     } else {
@@ -129,7 +141,6 @@ void Widget::applyModeSettings(const QString &mode)
         ui->settingsBtn->setFont(btnFont);
         ui->readBtn->setFont(btnFont);
         ui->chatTitleLabel->setFont(font);
-        ui->historyTitle->setFont(labelFont);
         ui->historyList->setFont(font);
         ui->voiceLabel->setFont(labelFont);
     }
@@ -138,8 +149,19 @@ void Widget::applyModeSettings(const QString &mode)
 void Widget::applyFontColor(const QString &color)
 {
     m_fontColor = color;
-    ui->textBrowser->setStyleSheet(QString("color: %1;").arg(color));
-    ui->lineEdit->setStyleSheet(QString("color: %1;").arg(color));
+    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: %2; }").arg(color).arg(m_bgColor));
+    ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; }").arg(color).arg(m_bgColor));
+    ui->userLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(color));
+    ui->chatTitleLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(color));
+    ui->voiceLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(color));
+}
+
+void Widget::applyBgColor(const QString &color)
+{
+    m_bgColor = color;
+    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: %2; }").arg(m_fontColor).arg(color));
+    ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; }").arg(m_fontColor).arg(color));
+    this->setStyleSheet(QString("QWidget { background-color: %1; }").arg(color));
 }
 
 void Widget::connectToServer()
@@ -147,12 +169,12 @@ void Widget::connectToServer()
     if (socket->state() == QTcpSocket::ConnectedState) {
         socket->disconnectFromHost();
     }
-    ui->textBrowser->append(QString("🔌 正在连接服务器 %1:%2...").arg(serverIP).arg(serverPort));
-    socket->connectToHost(serverIP, serverPort);
+    ui->textBrowser->append(QString("🔌 正在连接服务器 %1:%2...").arg(m_serverIP).arg(m_serverPort));
+    socket->connectToHost(m_serverIP, m_serverPort);
     conFlag = 1;
 }
 
-QString Widget::getHistoryDir()
+QString Widget::getHistoryDir() const
 {
     QString appDir = QCoreApplication::applicationDirPath();
     QString historyDir = appDir + "/chat_history";
@@ -301,15 +323,13 @@ void Widget::connectError(QAbstractSocket::SocketError err)
         } else {
             this->close();
         }
-    } else {
-        emit sendInfo(count);
     }
 }
 
 void Widget::reconnect()
 {
     count++;
-    socket->connectToHost(serverIP, serverPort);
+    socket->connectToHost(m_serverIP, m_serverPort);
 }
 
 void Widget::on_pushButton_clicked()
@@ -462,13 +482,15 @@ void Widget::onSettingsBtnClicked()
         settingsWidget->setWindowModality(Qt::NonModal);
         settingsWidget->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
         settingsWidget->setUsername(m_username);
-        settingsWidget->setServerConfig(serverIP, serverPort, m_autoConnect);
+        settingsWidget->setServerConfig(m_serverIP, m_serverPort, m_autoConnect);
         settingsWidget->setCurrentMode(m_currentMode);
         settingsWidget->setFontColor(m_fontColor);
+        settingsWidget->setBgColor(m_bgColor);
 
         connect(settingsWidget, &SettingsWidget::logout, this, &Widget::onLogout);
         connect(settingsWidget, &SettingsWidget::modeChanged, this, &Widget::onModeChanged);
         connect(settingsWidget, &SettingsWidget::fontColorChanged, this, &Widget::onFontColorChanged);
+        connect(settingsWidget, &SettingsWidget::bgColorChanged, this, &Widget::onBgColorChanged);
         connect(settingsWidget, &SettingsWidget::serverConfigChanged, this, &Widget::onServerConfigChanged);
         connect(settingsWidget, &SettingsWidget::closeSettings, this, &Widget::onCloseSettings);
         connect(settingsWidget, &SettingsWidget::cacheCleared, this, &Widget::onCacheCleared);
@@ -488,7 +510,7 @@ void Widget::onLogout()
         delete settingsWidget;
         settingsWidget = nullptr;
     }
-    emit logout();
+    emit backToMenu();
 }
 
 void Widget::onModeChanged(const QString &mode)
@@ -502,10 +524,15 @@ void Widget::onFontColorChanged(const QString &color)
     applyFontColor(color);
 }
 
+void Widget::onBgColorChanged(const QString &color)
+{
+    applyBgColor(color);
+}
+
 void Widget::onServerConfigChanged(const QString &ip, quint16 port, bool autoConnect)
 {
-    serverIP = ip;
-    serverPort = port;
+    m_serverIP = ip;
+    m_serverPort = port;
     m_autoConnect = autoConnect;
 
     if (autoConnect) {
@@ -520,6 +547,14 @@ void Widget::onCloseSettings()
         delete settingsWidget;
         settingsWidget = nullptr;
     }
+}
+
+void Widget::onLogoutFromSettings()
+{
+    if (socket->state() == QTcpSocket::ConnectedState) {
+        socket->disconnectFromHost();
+    }
+    emit backToMenu();
 }
 
 void Widget::onReadBtnClicked()

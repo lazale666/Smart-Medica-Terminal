@@ -23,12 +23,18 @@ class Speech
 {
 public:
     explicit Speech();
+    ~Speech();
     QString speechIdentify(QString fileName);
     bool textToSpeech(const QString &text, const QString &outputFile = "tts.wav");
     bool playAudio(const QString &filePath);
+    void stopAudio();
+    bool isPlaying() const;
+    
 private:
     QString getJsonValue(QByteArray ba, QString key);
     QString getAccessToken();
+    QString refreshAccessToken();
+    
 private:
     QString accessToken;
     QProcess *playerProcess;

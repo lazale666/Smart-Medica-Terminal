@@ -13,6 +13,9 @@ SOURCES += \
     loginwidget.cpp \
     main.cpp \
     mainwindow.cpp \
+    menuwidget.cpp \
+    medicalrecordwidget.cpp \
+    recorddetailwidget.cpp \
     settingswidget.cpp \
     speech.cpp \
     widget.cpp
@@ -23,6 +26,9 @@ HEADERS += \
     http.h \
     loginwidget.h \
     mainwindow.h \
+    menuwidget.h \
+    medicalrecordwidget.h \
+    recorddetailwidget.h \
     settingswidget.h \
     speech.h \
     widget.h
@@ -31,6 +37,9 @@ FORMS += \
     dialog.ui \
     loginwidget.ui \
     mainwindow.ui \
+    menuwidget.ui \
+    medicalrecordwidget.ui \
+    recorddetailwidget.ui \
     settingswidget.ui \
     widget.ui
 

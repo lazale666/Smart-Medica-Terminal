@@ -29,6 +29,16 @@
             <number>10</number>
           </property>
           <item>
+            <widget class="QPushButton" name="backBtn">
+              <property name="text">
+                <string>← 返回菜单</string>
+              </property>
+              <property name="minimumHeight">
+                <number>40</number>
+              </property>
+            </widget>
+          </item>
+          <item>
             <widget class="QPushButton" name="newChatBtn">
               <property name="text">
                 <string>➕ 新对话</string>

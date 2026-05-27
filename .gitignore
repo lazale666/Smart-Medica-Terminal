@@ -1,0 +1,56 @@
+# Qt Creator 项目文件
+.qtcreator/
+*.pro.user
+*.pro.user.*
+.qtc_clangd/
+
+# 编译输出目录
+build/
+debug/
+release/
+Makefile*
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+
+# Qt自动生成的文件
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# Qt Makefile相关
+*.mk
+*.pri
+*.prl
+.config
+.cache/
+
+# 调试文件
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# 运行时生成的文件
+chat_history/
+record.wav
+*.txt
+
+# 用户特定文件
+.vscode/
+.idea/
+*.iml
+
+# OS生成的文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 其他
+*.user
+*.stash

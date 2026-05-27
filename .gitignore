@@ -40,6 +40,7 @@ ui_*.h
 chat_history/
 record.wav
 *.txt
+!requirements.txt
 
 # 用户特定文件
 .vscode/

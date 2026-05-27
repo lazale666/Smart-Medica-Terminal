@@ -29,6 +29,9 @@ ui_*.h
 .config
 .cache/
 
+# vscode workspace files
+Smart-Medica-Terminal.code-workspace
+
 # 调试文件
 *.log
 *.tmp

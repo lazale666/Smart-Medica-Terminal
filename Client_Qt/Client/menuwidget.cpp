@@ -64,6 +64,16 @@ void MenuWidget::disconnectFromServer()
     }
 }
 
+void MenuWidget::ensureServerConnected()
+{
+    loadSettings();
+    if (m_autoConnect) {
+        connectToServer();
+    } else {
+        updateConnectionStatus();
+    }
+}
+
 void MenuWidget::applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor)
 {
     applyModeSettings(mode);
@@ -212,6 +222,10 @@ void MenuWidget::onSettingsBtnClicked()
         m_serverIP = ip;
         m_serverPort = port;
         m_autoConnect = autoConnect;
+        if (socket->state() == QTcpSocket::ConnectedState || socket->state() == QTcpSocket::ConnectingState) {
+            socket->abort();
+        }
+        connectToServer();
     });
 
     connect(settings, &SettingsWidget::fontColorChanged, [=](const QString &color) {

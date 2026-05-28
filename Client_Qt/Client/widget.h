@@ -11,6 +11,7 @@
 #include <QListWidgetItem>
 #include <QSettings>
 #include <QTextToSpeech>
+#include <QVector>
 #include <functional>
 #include "dialog.h"
 #include "audio.h"
@@ -20,6 +21,18 @@
 QT_BEGIN_NAMESPACE
 namespace Ui { class Widget; }
 QT_END_NAMESPACE
+
+class QScrollArea;
+class QVBoxLayout;
+class QPushButton;
+
+struct WidgetChatMessage
+{
+    QString sender;
+    QString message;
+    bool isSelf;
+    bool isSystem;
+};
 
 class Widget : public QWidget
 {
@@ -75,6 +88,12 @@ private:
     void loadChatHistory(const QString &fileName);
     void refreshHistoryList();
     QString getHistoryDir() const;
+    void setupMessageArea();
+    void clearMessages();
+    void rebuildMessages();
+    void updateScrollState();
+    void updateNewMessageButtonVisibility(bool visible);
+    void scrollToBottomAndClearReminder();
     void appendChatMessage(const QString &sender, const QString &message, bool isSelf);
     void appendSystemMessage(const QString &message);
     void appendHistorySeparator(bool isTop);
@@ -92,6 +111,11 @@ private:
     Audio *audio;
     Speech *speech;
     QTextToSpeech *m_speech;
+    QScrollArea *m_messageScrollArea;
+    QWidget *m_messageContent;
+    QVBoxLayout *m_messageLayout;
+    QPushButton *m_newMessageButton;
+    QVector<WidgetChatMessage> m_messages;
     QByteArray buffer;
     QString m_currentChatFile;
     QString m_username;
@@ -105,7 +129,9 @@ private:
     int conFlag, errFlag, count;
     bool isRecording, m_isThinking, m_isInterrupted;
     bool m_isNewSession;
+    bool m_isUserNearBottom;
     QString m_firstMessage;
+    QString m_lastAssistantMessage;
 };
 
 #endif // WIDGET_H

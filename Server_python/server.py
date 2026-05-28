@@ -272,8 +272,15 @@ def handle_client(client_socket, addr):
 
                         elif msg_dict.get('type') == 'connect_doctor':
                             doctor_id = msg_dict.get('doctor_id')
+                            request_username = msg_dict.get('username')
                             logger.info(f"[DEBUG] connect_doctor request: doctor_id={doctor_id}")
                             target_doctor = None
+
+                            client_info['role'] = 'client'
+                            if request_username:
+                                client_info['name'] = request_username
+                            elif not client_info.get('name'):
+                                client_info['name'] = 'Unknown'
                             
                             with clients_lock:
                                 for doctor in doctors:
@@ -294,7 +301,8 @@ def handle_client(client_socket, addr):
                                 })
                                 send_response(target_doctor['socket'], {
                                     'type': 'new_client',
-                                    'client_name': client_info.get('name', 'Unknown')
+                                    'client_name': client_info.get('name', 'Unknown'),
+                                    'username': client_info.get('name', 'Unknown')
                                 })
                                 logger.info(f"Connected client {client_info.get('name')} with doctor {target_doctor.get('name')}")
                             else:
@@ -328,7 +336,8 @@ def handle_client(client_socket, addr):
                                 })
                                 send_response(target_doctor['socket'], {
                                     'type': 'new_client',
-                                    'client_name': client_info.get('name', 'Unknown')
+                                    'client_name': client_info.get('name', 'Unknown'),
+                                    'username': client_info.get('name', 'Unknown')
                                 })
                                 logger.info(f"Auto-connected client {client_info.get('name')} with doctor {target_doctor.get('name')}")
                             else:
@@ -372,6 +381,11 @@ def handle_client(client_socket, addr):
     finally:
         with clients_lock:
             if client_info.get('role') == 'client' and client_info.get('current_doctor'):
+                send_response(client_info['current_doctor']['socket'], {
+                    'type': 'client_disconnected',
+                    'client_name': client_info.get('name', 'Unknown'),
+                    'username': client_info.get('name', 'Unknown')
+                })
                 client_info['current_doctor']['current_client'] = None
             elif client_info.get('role') == 'doctor' and client_info.get('current_client'):
                 client_info['current_client']['current_doctor'] = None

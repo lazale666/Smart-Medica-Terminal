@@ -1,5 +1,6 @@
 #include "widget.h"
 #include "ui_widget.h"
+#include "chatmessagewidgets.h"
 #include <QDir>
 #include <QTextStream>
 #include <QDateTime>
@@ -7,6 +8,11 @@
 #include <QStringConverter>
 #include <QSettings>
 #include <QFont>
+#include <QGridLayout>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QSizePolicy>
+#include <QVBoxLayout>
 #include <QtEndian>
 #include "themehelpers.h"
 
@@ -14,8 +20,13 @@ Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget)
     , settingsWidget(nullptr)
+    , m_messageScrollArea(nullptr)
+    , m_messageContent(nullptr)
+    , m_messageLayout(nullptr)
+    , m_newMessageButton(nullptr)
 {
     ui->setupUi(this);
+    setupMessageArea();
     socket = new QTcpSocket(this);
     timer = new QTimer(this);
     historyTimer = new QTimer(this);
@@ -56,6 +67,8 @@ Widget::Widget(QWidget *parent)
     isRecording = false;
     m_isThinking = false;
     m_isInterrupted = false;
+    m_isUserNearBottom = true;
+    m_lastAssistantMessage.clear();
 
     ui->chatTitleLabel->setVisible(true);
     ui->pushButton->setText("发送");
@@ -86,6 +99,7 @@ void Widget::loadSettings()
     applyModeSettings(m_currentMode);
     applyBgColor(m_bgColor);
     applyFontColor(m_fontColor);
+    scrollToBottomAndClearReminder();
 }
 
 void Widget::setUsername(const QString &username)
@@ -116,7 +130,7 @@ void Widget::applyAppearance(const QString &mode, const QString &bgColor, const 
 void Widget::applyModeSettings(const QString &mode)
 {
     m_currentMode = mode;
-    QFont font = ui->textBrowser->font();
+    QFont font = m_messageContent ? m_messageContent->font() : ui->lineEdit->font();
     QFont labelFont = ui->userLabel->font();
     QFont btnFont = ui->pushButton->font();
     QFont lineFont = ui->lineEdit->font();
@@ -127,7 +141,9 @@ void Widget::applyModeSettings(const QString &mode)
         btnFont.setPointSize(15);
         lineFont.setPointSize(15);
 
-        ui->textBrowser->setFont(font);
+        if (m_messageContent) {
+            m_messageContent->setFont(font);
+        }
         ui->userLabel->setFont(labelFont);
         ui->pushButton->setFont(btnFont);
         ui->lineEdit->setFont(lineFont);
@@ -156,7 +172,9 @@ void Widget::applyModeSettings(const QString &mode)
         btnFont.setPointSize(10);
         lineFont.setPointSize(10);
 
-        ui->textBrowser->setFont(font);
+        if (m_messageContent) {
+            m_messageContent->setFont(font);
+        }
         ui->userLabel->setFont(labelFont);
         ui->pushButton->setFont(btnFont);
         ui->lineEdit->setFont(lineFont);
@@ -187,11 +205,23 @@ void Widget::applyFontColor(const QString &color)
     m_fontColor = color.isEmpty() ? ThemeHelpers::defaultFontColorForBg(m_bgColor) : color;
     const bool light = ThemeHelpers::isLightTheme(m_bgColor);
     const QString inputBg = light ? "rgba(255, 255, 255, 0.94)" : "rgba(2, 9, 20, 0.86)";
-    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: %2; border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 16px; padding: 12px; }").arg(m_fontColor, inputBg));
+    const QString reminderBg = light ? "rgba(255, 207, 90, 0.96)" : "rgba(255, 207, 90, 0.95)";
+    const QString reminderHover = light ? "rgba(255, 180, 90, 1.0)" : "rgba(255, 122, 89, 1.0)";
+    if (m_messageScrollArea) {
+        m_messageScrollArea->setStyleSheet(QString(
+            "QScrollArea#messageScrollArea { background: %1; border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 16px; }"
+            "QWidget#messageContent { background: transparent; }").arg(inputBg));
+    }
+    if (m_newMessageButton) {
+        m_newMessageButton->setStyleSheet(QString(
+            "QPushButton#newMessageButton { background: %1; color: #03111D; border: 1px solid rgba(255, 122, 89, 0.75); border-radius: 14px; padding: 6px 14px; font: 700 12px \"Microsoft YaHei\"; min-width: 96px; min-height: 28px; }"
+            "QPushButton#newMessageButton:hover { background: %2; }").arg(reminderBg, reminderHover));
+    }
     ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; border: 1px solid rgba(0, 229, 255, 0.55); border-radius: 16px; padding: 8px 12px; }").arg(m_fontColor, inputBg));
     ui->userLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
     ui->chatTitleLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
     ui->voiceLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(m_fontColor));
+    rebuildMessages();
 }
 
 void Widget::applyBgColor(const QString &color)
@@ -250,8 +280,8 @@ void Widget::applyBgColor(const QString &color)
 
 void Widget::connectToServer()
 {
-    if (socket->state() == QTcpSocket::ConnectedState) {
-        socket->disconnectFromHost();
+    if (socket->state() == QTcpSocket::ConnectedState || socket->state() == QTcpSocket::ConnectingState) {
+        socket->abort();
     }
     appendSystemMessage(QString("正在连接服务器 %1:%2...").arg(m_serverIP).arg(m_serverPort));
     socket->connectToHost(m_serverIP, m_serverPort);
@@ -269,11 +299,115 @@ QString Widget::getHistoryDir() const
     return historyDir;
 }
 
+void Widget::setupMessageArea()
+{
+    m_messageScrollArea = new QScrollArea(this);
+    m_messageScrollArea->setObjectName("messageScrollArea");
+    m_messageScrollArea->setWidgetResizable(true);
+    m_messageScrollArea->setFrameShape(QFrame::NoFrame);
+    m_messageScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    m_messageContent = new QWidget(m_messageScrollArea);
+    m_messageContent->setObjectName("messageContent");
+    m_messageLayout = new QVBoxLayout(m_messageContent);
+    m_messageLayout->setContentsMargins(18, 18, 18, 18);
+    m_messageLayout->setSpacing(2);
+    m_messageLayout->addStretch();
+    m_messageScrollArea->setWidget(m_messageContent);
+
+    QWidget *messageLayer = new QWidget(this);
+    messageLayer->setObjectName("messageLayer");
+    messageLayer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    QGridLayout *messageLayerLayout = new QGridLayout(messageLayer);
+    messageLayerLayout->setContentsMargins(0, 0, 0, 0);
+    messageLayerLayout->setSpacing(0);
+    messageLayerLayout->addWidget(m_messageScrollArea, 0, 0);
+
+    if (QVBoxLayout *rightLayout = qobject_cast<QVBoxLayout *>(ui->rightLayout)) {
+        rightLayout->replaceWidget(ui->textBrowser, messageLayer);
+    }
+    ui->textBrowser->hide();
+    ui->textBrowser->deleteLater();
+    ui->textBrowser = nullptr;
+
+    m_newMessageButton = new QPushButton(QStringLiteral("有新消息"), messageLayer);
+    m_newMessageButton->setObjectName("newMessageButton");
+    m_newMessageButton->setVisible(false);
+    m_newMessageButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    messageLayerLayout->addWidget(m_newMessageButton, 0, 0, Qt::AlignHCenter | Qt::AlignBottom);
+    connect(m_newMessageButton, &QPushButton::clicked, this, [this]() {
+        scrollToBottomAndClearReminder();
+    });
+
+    connect(m_messageScrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this]() {
+        updateScrollState();
+        if (m_isUserNearBottom) {
+            updateNewMessageButtonVisibility(false);
+        }
+    });
+}
+
+void Widget::clearMessages()
+{
+    m_messages.clear();
+    m_isUserNearBottom = true;
+    rebuildMessages();
+    updateNewMessageButtonVisibility(false);
+}
+
+void Widget::rebuildMessages()
+{
+    if (!m_messageLayout || !m_messageContent || !m_messageScrollArea) {
+        return;
+    }
+
+    const bool wasNearBottom = m_isUserNearBottom;
+    clearLayoutWidgets(m_messageLayout);
+    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
+    const ChatThemePalette palette = buildChatThemePalette(light);
+    const int maxBubbleWidth = qMax(280, qRound(width() * 0.58));
+
+    for (const WidgetChatMessage &msg : std::as_const(m_messages)) {
+        QWidget *item = msg.isSystem
+            ? createSystemMessageWidget(msg.message, palette, m_messageContent)
+            : createChatMessageWidget(msg.sender, msg.message, msg.isSelf, palette, maxBubbleWidth, m_messageContent);
+        m_messageLayout->addWidget(item);
+    }
+
+    m_messageLayout->addStretch();
+    if (wasNearBottom) {
+        scrollToBottomAndClearReminder();
+    }
+}
+
+void Widget::updateScrollState()
+{
+    m_isUserNearBottom = isScrollAreaNearBottom(m_messageScrollArea);
+}
+
+void Widget::updateNewMessageButtonVisibility(bool visible)
+{
+    if (m_newMessageButton) {
+        m_newMessageButton->setVisible(visible);
+        if (visible) {
+            m_newMessageButton->raise();
+        }
+    }
+}
+
+void Widget::scrollToBottomAndClearReminder()
+{
+    scrollAreaToBottom(m_messageScrollArea);
+    updateScrollState();
+    updateNewMessageButtonVisibility(false);
+}
+
 void Widget::createNewChat()
 {
-    ui->textBrowser->clear();
+    clearMessages();
     m_isNewSession = true;
     m_firstMessage.clear();
+    m_lastAssistantMessage.clear();
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
     m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
@@ -321,7 +455,7 @@ void Widget::onHistoryItemClicked(QListWidgetItem *item)
     QString fileName = item->data(Qt::UserRole).toString();
     m_currentChatFile = getHistoryDir() + "/" + fileName;
     m_isNewSession = false;
-    ui->textBrowser->clear();
+    clearMessages();
     loadChatHistory(fileName);
     applyFontColor(m_fontColor);
 }
@@ -329,11 +463,6 @@ void Widget::onHistoryItemClicked(QListWidgetItem *item)
 void Widget::connectService()
 {
     appendSystemMessage("已连接服务器");
-
-    if (!m_currentChatFile.isEmpty()) {
-        QFileInfo fi(m_currentChatFile);
-        loadChatHistory(fi.fileName());
-    }
 }
 
 void Widget::readData()
@@ -365,19 +494,25 @@ void Widget::readData()
 
             if (value.isString()) {
                 QString content = value.toString();
+                updateScrollState();
+                const bool shouldStayPinned = m_isUserNearBottom;
 
                 if (m_isInterrupted) {
                     m_isThinking = false;
                     m_isInterrupted = false;
-                    ui->textBrowser->append("已中断");
+                    appendSystemMessage("已中断");
                     ui->pushButton->setText("发送");
                     continue;
                 }
 
                 m_isThinking = false;
                 ui->pushButton->setText("发送");
+                m_lastAssistantMessage = content;
                 appendChatMessage("创伤小组", content, false);
                 saveChatMessage("创伤小组", content);
+                if (!shouldStayPinned) {
+                    updateNewMessageButtonVisibility(true);
+                }
             }
         }
     }
@@ -426,6 +561,7 @@ void Widget::on_pushButton_clicked()
 
     appendChatMessage(m_username.isEmpty() ? "我" : m_username, message, true);
     saveChatMessage("我", message);
+    scrollToBottomAndClearReminder();
 
     if (m_isNewSession && m_firstMessage.isEmpty()) {
         m_firstMessage = message;
@@ -477,6 +613,7 @@ void Widget::on_voiceBtn_released()
     if (!recognizedText.isEmpty()) {
         appendChatMessage(m_username.isEmpty() ? "我" : m_username, recognizedText, true);
         saveChatMessage("我", recognizedText);
+        scrollToBottomAndClearReminder();
 
         if (m_isNewSession && m_firstMessage.isEmpty()) {
             m_firstMessage = recognizedText;
@@ -636,9 +773,7 @@ void Widget::onServerConfigChanged(const QString &ip, quint16 port, bool autoCon
     m_serverPort = port;
     m_autoConnect = autoConnect;
 
-    if (autoConnect) {
-        connectToServer();
-    }
+    connectToServer();
 }
 
 void Widget::onSpeechSettingsChanged(double volume, double rate)
@@ -649,8 +784,7 @@ void Widget::onSpeechSettingsChanged(double volume, double rate)
 
 void Widget::onReadBtnClicked()
 {
-    QString text = ui->textBrowser->toPlainText();
-    if (text.isEmpty()) {
+    if (m_lastAssistantMessage.trimmed().isEmpty()) {
         QMessageBox::information(nullptr, "提示", "没有可朗读的内容");
         return;
     }
@@ -661,26 +795,7 @@ void Widget::onReadBtnClicked()
         return;
     }
 
-    ui->textBrowser->append("🔊 正在朗读...");
-
-    QString lastMessage = "";
-    QStringList lines = text.split("\n");
-    for (int i = lines.size() - 1; i >= 0; i--) {
-        QString line = lines[i].trimmed();
-        if (line.startsWith("🤖 创伤小组：")) {
-            lastMessage = line.mid(5).trimmed();
-            break;
-        }
-    }
-
-    if (lastMessage.isEmpty()) {
-        lastMessage = text.right(200).trimmed();
-    }
-
-    if (lastMessage.isEmpty()) {
-        QMessageBox::information(nullptr, "提示", "没有找到可朗读的内容");
-        return;
-    }
+    appendSystemMessage("正在朗读...");
 
     QSettings settings("SmartMedica", "Client");
     double volume = settings.value("speechVolume", 1.0).toDouble();
@@ -691,7 +806,7 @@ void Widget::onReadBtnClicked()
 
     ui->readBtn->setText("⏹️ 停止");
 
-    m_speech->say(lastMessage);
+    m_speech->say(m_lastAssistantMessage);
     connect(m_speech, &QTextToSpeech::stateChanged, this, [=](QTextToSpeech::State state) {
         if (state == QTextToSpeech::Ready) {
             ui->readBtn->setText("🔊 朗读");
@@ -701,57 +816,29 @@ void Widget::onReadBtnClicked()
 
 void Widget::onCacheCleared()
 {
-    ui->textBrowser->clear();
+    clearMessages();
     appendSystemMessage("已开启新对话");
     m_isNewSession = true;
     m_firstMessage.clear();
+    m_lastAssistantMessage.clear();
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
     m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
 
     refreshHistoryList();
+    scrollToBottomAndClearReminder();
 }
 
 void Widget::appendChatMessage(const QString &sender, const QString &message, bool isSelf)
 {
-    const QString safeSender = sender.toHtmlEscaped();
-    const QString safeMessage = message.toHtmlEscaped().replace("\n", "<br>");
-    const QString wrapperStyle = isSelf
-        ? "margin: 12px 0 12px auto; max-width: 72%; text-align: right;"
-        : "margin: 12px auto 12px 0; max-width: 72%; text-align: left;";
-    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
-    const QString nameColor = isSelf ? (light ? "#0F78B7" : "#8BD9FF") : (light ? "#157A52" : "#31FFB7");
-    const QString cardStyle = isSelf
-        ? QString("display:inline-block; background-color: %1; border: 1px solid %2; border-radius: 16px; padding: 12px 16px; color: %3;")
-              .arg(light ? "rgba(127,217,255,0.35)" : "rgba(0,229,255,0.18)",
-                   light ? "rgba(15,120,183,0.35)" : "rgba(0,229,255,0.45)",
-                   light ? "#0F2740" : "#EAFBFF")
-        : QString("display:inline-block; background-color: %1; border: 1px solid %2; border-radius: 16px; padding: 12px 16px; color: %3;")
-              .arg(light ? "rgba(196,240,214,0.65)" : "rgba(49,255,183,0.14)",
-                   light ? "rgba(21,122,82,0.28)" : "rgba(49,255,183,0.35)",
-                   light ? "#0F2740" : "#EAFBFF");
-
-    ui->textBrowser->append(QString(
-        "<div style=\"%1\">"
-        "<div style=\"font-size:12px; font-weight:700; color:%2; margin-bottom:6px;\">%3</div>"
-        "<div style=\"%4\">%5</div>"
-        "</div>")
-        .arg(wrapperStyle, nameColor, safeSender, cardStyle, safeMessage));
+    m_messages.append({sender, message, isSelf, false});
+    rebuildMessages();
 }
 
 void Widget::appendSystemMessage(const QString &message)
 {
-    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
-    ui->textBrowser->append(QString(
-        "<div style=\"margin: 10px 0; text-align: center;\">"
-        "<span style=\"display:inline-block; padding: 6px 14px; border-radius: 14px; "
-        "background: %1; border: 1px solid %2; "
-        "color: %3; font-size: 12px;\">%4</span>"
-        "</div>")
-        .arg(light ? "rgba(15,39,64,0.08)" : "rgba(139,185,200,0.14)",
-             light ? "rgba(15,39,64,0.18)" : "rgba(139,185,200,0.28)",
-             light ? "#4C647A" : "#8BB9C8",
-             message.toHtmlEscaped()));
+    m_messages.append({QString(), message, false, true});
+    rebuildMessages();
 }
 
 void Widget::appendHistorySeparator(bool isTop)

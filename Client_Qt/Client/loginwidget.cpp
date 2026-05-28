@@ -151,6 +151,7 @@ void LoginWidget::on_loginBtn_clicked()
 
     if (checkUser(username, password)) {
         QMessageBox::information(nullptr, QStringLiteral("成功"), QStringLiteral("登录成功。"));
+        QMessageBox::information(nullptr, QStringLiteral("免责声明"), QStringLiteral("本程序仅供娱乐，不作为医学参考价值。"));
         emit loginSuccess(username);
     } else {
         QMessageBox::warning(nullptr, QStringLiteral("失败"), QStringLiteral("用户名或密码错误。"));

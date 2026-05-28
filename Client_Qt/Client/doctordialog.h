@@ -5,10 +5,24 @@
 #include <QTcpSocket>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QVector>
 
 namespace Ui {
 class DoctorDialog;
 }
+
+class QScrollArea;
+class QWidget;
+class QVBoxLayout;
+class QPushButton;
+
+struct DoctorChatMessage
+{
+    QString sender;
+    QString message;
+    bool isSelf;
+    bool isSystem;
+};
 
 class DoctorDialog : public QDialog
 {
@@ -27,6 +41,10 @@ private slots:
 
 private:
     Ui::DoctorDialog *ui;
+    QScrollArea *m_messageScrollArea;
+    QWidget *m_messageContent;
+    QVBoxLayout *m_messageLayout;
+    QPushButton *m_newMessageButton;
     QTcpSocket *m_socket;
     QString m_username;
     QString m_doctorName;
@@ -34,8 +52,15 @@ private:
     QString m_bgColor;
     QString m_fontColor;
     QByteArray m_buffer;
+    QVector<DoctorChatMessage> m_messages;
+    bool m_isUserNearBottom;
 
     void sendMessage(const QString &message);
+    void setupMessageArea();
+    void rebuildMessages();
+    void updateScrollState();
+    void updateNewMessageButtonVisibility(bool visible);
+    void scrollToBottomAndClearReminder();
     void appendChatMessage(const QString &sender, const QString &message, bool isSelf);
     void appendSystemMessage(const QString &message);
 };

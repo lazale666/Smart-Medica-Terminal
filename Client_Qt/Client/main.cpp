@@ -225,6 +225,7 @@ int main(int argc, char *argv[])
         menu->applyAppearance(mode, bgColor, fontColor);
         menu->setWindowTitle("医疗智能体 - " + username);
         menu->show();
+        menu->ensureServerConnected();
     });
 
     QObject::connect(menu, &MenuWidget::openChat, [=](const QString &serverIP, int serverPort, bool autoConnect) {

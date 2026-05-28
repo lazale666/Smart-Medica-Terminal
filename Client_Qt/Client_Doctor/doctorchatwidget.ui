@@ -14,89 +14,7 @@
    <string>医生咨询中心</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QWidget {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e0f7fa, stop:0.5 #b2ebf2, stop:1 #80deea);
-}
-QTextBrowser {
-    background-color: rgba(255, 255, 255, 0.98);
-    border: 1px solid rgba(0, 188, 212, 0.2);
-    border-radius: 16px;
-    padding: 20px;
-    font-size: 14px;
-    line-height: 1.6;
-}
-QLineEdit {
-    background-color: rgba(255, 255, 255, 0.95);
-    border: 2px solid rgba(0, 188, 212, 0.3);
-    border-radius: 25px;
-    padding: 12px 24px;
-    font-size: 14px;
-    color: #2c3e50;
-}
-QLineEdit:focus {
-    border-color: #00bcd4;
-    outline: none;
-}
-QPushButton {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #00bcd4, stop:1 #00acc1);
-    color: white;
-    border: none;
-    border-radius: 25px;
-    padding: 12px 32px;
-    font-size: 14px;
-    font-weight: 500;
-    min-width: 100px;
-}
-QPushButton:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #00acc1, stop:1 #0097a7);
-}
-QPushButton:pressed {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0097a7, stop:1 #00838f);
-}
-QPushButton#historyBtn {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff7043, stop:1 #f4511e);
-    min-width: 160px;
-    padding: 16px 40px;
-    font-size: 16px;
-    font-weight: 600;
-    border-radius: 30px;
-    border: 3px solid rgba(255, 255, 255, 0.4);
-}
-QPushButton#historyBtn:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f4511e, stop:1 #e64a19);
-    border-color: rgba(255, 255, 255, 0.6);
-}
-QPushButton#historyBtn:pressed {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #e64a19, stop:1 #d84315);
-}
-QPushButton#settingsBtn {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #9c27b0, stop:1 #7b1fa2);
-    min-width: 100px;
-    padding: 12px 24px;
-    font-size: 14px;
-    font-weight: 500;
-    border-radius: 25px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-}
-QPushButton#settingsBtn:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #7b1fa2, stop:1 #6a1b9a);
-    border-color: rgba(255, 255, 255, 0.6);
-}
-QPushButton#settingsBtn:pressed {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6a1b9a, stop:1 #4a148c);
-}
-QLabel {
-    color: #2c3e50;
-}
-QLabel#titleLabel {
-    font-size: 26px;
-    font-weight: 600;
-    color: #00838f;
-}
-QLabel#statusLabel {
-    font-size: 14px;
-}
-</string>
+   <string notr="true"/>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
@@ -108,7 +26,7 @@ QLabel#statusLabel {
    <item>
     <widget class="QWidget" name="headerWidget" native="true">
      <property name="styleSheet">
-      <string notr="true">background: rgba(255, 255, 255, 0.9); border-radius: 16px; padding: 24px;</string>
+      <string notr="true"/>
      </property>
      <layout class="QVBoxLayout" name="headerLayout">
       <property name="spacing">
@@ -168,7 +86,7 @@ QLabel#statusLabel {
    <item>
     <widget class="QTextBrowser" name="textBrowser">
      <property name="styleSheet">
-      <string notr="true">background-color: rgba(255, 255, 255, 0.98); border: 1px solid rgba(0, 188, 212, 0.15); border-radius: 16px; padding: 24px; font-size: 14px; line-height: 1.7;</string>
+      <string notr="true"/>
      </property>
      <property name="html">
       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
@@ -185,7 +103,7 @@ p, li { white-space: pre-wrap; }
    <item>
     <widget class="QWidget" name="inputWidget" native="true">
      <property name="styleSheet">
-      <string notr="true">background: rgba(255, 255, 255, 0.95); border-radius: 16px; padding: 16px;</string>
+      <string notr="true"/>
      </property>
      <layout class="QHBoxLayout" name="inputLayout">
       <property name="spacing">

@@ -23,13 +23,12 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     connect(ui->navModeBtn, &QPushButton::clicked, this, &SettingsWidget::onNavModeClicked);
     connect(ui->navCacheBtn, &QPushButton::clicked, this, &SettingsWidget::onNavCacheClicked);
     connect(ui->navServerBtn, &QPushButton::clicked, this, &SettingsWidget::onNavServerClicked);
-    connect(ui->closeBtn, &QPushButton::clicked, this, &SettingsWidget::onCloseBtnClicked);
 
     connect(ui->logoutBtn, &QPushButton::clicked, this, &SettingsWidget::onLogoutBtnClicked);
     connect(ui->modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsWidget::onModeChanged);
     connect(ui->colorBtn, &QPushButton::clicked, this, &SettingsWidget::onColorBtnClicked);
     connect(ui->bgColorBtn, &QPushButton::clicked, this, &SettingsWidget::onBgColorBtnClicked);
-    connect(ui->saveServerBtn, &QPushButton::clicked, this, &SettingsWidget::onCloseBtnClicked);
+    connect(ui->saveServerBtn, &QPushButton::clicked, this, &SettingsWidget::onSaveServerBtnClicked);
 
     connect(ui->selectAllChatBtn, &QPushButton::clicked, this, &SettingsWidget::onSelectAllChatClicked);
     connect(ui->deleteChatBtn, &QPushButton::clicked, this, &SettingsWidget::onDeleteChatClicked);
@@ -227,6 +226,16 @@ void SettingsWidget::onNavCacheClicked()
 void SettingsWidget::onNavServerClicked()
 {
     switchToPage(3);
+}
+
+void SettingsWidget::onSaveServerBtnClicked()
+{
+    saveSettings();
+    QString ip = ui->ipEdit->text();
+    quint16 port = ui->portEdit->text().toUInt();
+    bool autoConnect = ui->autoConnectCheck->isChecked();
+    emit serverConfigChanged(ip, port, autoConnect);
+    QMessageBox::information(this, "提示", "服务器配置已保存");
 }
 
 void SettingsWidget::onCloseBtnClicked()

@@ -18,6 +18,7 @@ public:
 
     void setRecordData(const QString &diseaseName, const QString &diagnosisDate, const QString &treatment);
     void setReadOnly(bool readOnly);
+    void applyModeSettings(const QString &mode);
 
 signals:
     void saveRecord(const QString &diseaseName, const QString &diagnosisDate, const QString &treatment);
@@ -28,6 +29,7 @@ private slots:
 private:
     Ui::RecordDetailWidget *ui;
     QString m_fileName;
+    QString m_currentMode;
     bool m_isNewRecord;
 };
 

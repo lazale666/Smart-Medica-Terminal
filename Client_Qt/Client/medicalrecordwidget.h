@@ -1,4 +1,4 @@
-﻿#ifndef MEDICALRECORDWIDGET_H
+#ifndef MEDICALRECORDWIDGET_H
 #define MEDICALRECORDWIDGET_H
 
 #include <QWidget>
@@ -22,6 +22,7 @@ public:
 
     void setServerInfo(const QString &ip, int port);
     void setUsername(const QString &username);
+    void applyModeSettings(const QString &mode);
     void applyFontColor(const QString &color);
     void applyBgColor(const QString &color);
 
@@ -38,6 +39,7 @@ private slots:
     void onSocketReadyRead();
     void onSocketError(QAbstractSocket::SocketError error);
     void onSettingsBtnClicked();
+    void onModeChanged(const QString &mode);
     void onFontColorChanged(const QString &color);
     void onBgColorChanged(const QString &color);
 
@@ -54,6 +56,7 @@ private:
     QString m_username;
     QString m_serverIP;
     int m_serverPort;
+    QString m_currentMode;
     QTcpSocket *socket;
     QByteArray m_buffer;
     bool m_isAiThinking;

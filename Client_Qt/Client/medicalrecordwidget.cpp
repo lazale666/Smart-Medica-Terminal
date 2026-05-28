@@ -1,4 +1,4 @@
-﻿
+
 #include "medicalrecordwidget.h"
 #include "ui_medicalrecordwidget.h"
 #include <QMessageBox>
@@ -17,6 +17,7 @@ MedicalRecordWidget::MedicalRecordWidget(QWidget *parent) :
     ui(new Ui::MedicalRecordWidget),
     m_serverIP("127.0.0.1"),
     m_serverPort(9999),
+    m_currentMode("普通模式"),
     m_isAiThinking(false),
     m_detailWidget(nullptr),
     settingsWidget(nullptr),
@@ -62,6 +63,56 @@ void MedicalRecordWidget::setUsername(const QString &username)
     m_username = username;
 }
 
+void MedicalRecordWidget::applyModeSettings(const QString &mode)
+{
+    m_currentMode = mode;
+    
+    QFont font = ui->diseaseEdit->font();
+    QFont labelFont = ui->dateEdit->font();
+    QFont btnFont = ui->aiFillBtn->font();
+    QFont titleFont = ui->titleLabel->font();
+    
+    if (mode == "关怀模式") {
+        font.setPointSize(font.pointSize() * 1.5);
+        labelFont.setPointSize(labelFont.pointSize() * 1.5);
+        btnFont.setPointSize(btnFont.pointSize() * 1.5);
+        titleFont.setPointSize(titleFont.pointSize() * 1.5);
+        
+        ui->diseaseEdit->setFont(font);
+        ui->dateEdit->setFont(labelFont);
+        ui->treatmentEdit->setFont(font);
+        ui->recordList->setFont(font);
+        ui->aiFillBtn->setFont(btnFont);
+        ui->saveBtn->setFont(btnFont);
+        ui->backBtn->setFont(btnFont);
+        ui->settingsBtn->setFont(btnFont);
+        ui->titleLabel->setFont(titleFont);
+        ui->recordListLabel->setFont(titleFont);
+        ui->diseaseLabel->setFont(labelFont);
+        ui->dateLabel->setFont(labelFont);
+        ui->treatmentLabel->setFont(labelFont);
+    } else {
+        font.setPointSize(10);
+        labelFont.setPointSize(10);
+        btnFont.setPointSize(10);
+        titleFont.setPointSize(14);
+        
+        ui->diseaseEdit->setFont(font);
+        ui->dateEdit->setFont(labelFont);
+        ui->treatmentEdit->setFont(font);
+        ui->recordList->setFont(font);
+        ui->aiFillBtn->setFont(btnFont);
+        ui->saveBtn->setFont(btnFont);
+        ui->backBtn->setFont(btnFont);
+        ui->settingsBtn->setFont(btnFont);
+        ui->titleLabel->setFont(titleFont);
+        ui->recordListLabel->setFont(titleFont);
+        ui->diseaseLabel->setFont(labelFont);
+        ui->dateLabel->setFont(labelFont);
+        ui->treatmentLabel->setFont(labelFont);
+    }
+}
+
 void MedicalRecordWidget::applyFontColor(const QString &color)
 {
     m_fontColor = color;
@@ -87,11 +138,21 @@ void MedicalRecordWidget::onSettingsBtnClicked()
         settingsWidget->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
         settingsWidget->setUsername(m_username);
         settingsWidget->setServerConfig(m_serverIP, m_serverPort, true);
+        settingsWidget->setCurrentMode(m_currentMode);
         settingsWidget->setFontColor(m_fontColor);
         settingsWidget->setBgColor(m_bgColor);
 
+        connect(settingsWidget, &SettingsWidget::modeChanged, this, &MedicalRecordWidget::onModeChanged);
         connect(settingsWidget, &SettingsWidget::fontColorChanged, this, &MedicalRecordWidget::onFontColorChanged);
         connect(settingsWidget, &SettingsWidget::bgColorChanged, this, &MedicalRecordWidget::onBgColorChanged);
+        connect(settingsWidget, &SettingsWidget::serverConfigChanged, this, [=](const QString &ip, quint16 port, bool autoConnect) {
+            m_serverIP = ip;
+            m_serverPort = port;
+            Q_UNUSED(autoConnect);
+            if (socket->state() != QTcpSocket::ConnectedState && socket->state() != QTcpSocket::ConnectingState) {
+                socket->connectToHost(m_serverIP, m_serverPort);
+            }
+        });
         connect(settingsWidget, &SettingsWidget::destroyed, this, [=]() {
             settingsWidget = nullptr;
         });
@@ -104,6 +165,11 @@ void MedicalRecordWidget::onSettingsBtnClicked()
 void MedicalRecordWidget::onFontColorChanged(const QString &color)
 {
     applyFontColor(color);
+}
+
+void MedicalRecordWidget::onModeChanged(const QString &mode)
+{
+    applyModeSettings(mode);
 }
 
 void MedicalRecordWidget::onBgColorChanged(const QString &color)
@@ -129,7 +195,7 @@ void MedicalRecordWidget::onAiFillBtnClicked()
     ui->saveBtn->setEnabled(false);
     ui->statusLabel->setText("状态：AI正在思考...");
 
-    QString question = QString("我得了%1，我该怎么办？").arg(diseaseName);
+    QString question = QString("我得了%1，我该怎么办？直接为我提供治疗建议").arg(diseaseName);
 
     if (socket->state() != QTcpSocket::ConnectedState) {
         socket->connectToHost(m_serverIP, m_serverPort);
@@ -197,6 +263,7 @@ void MedicalRecordWidget::onRecordListClicked(QListWidgetItem *item)
             m_detailWidget->setAttribute(Qt::WA_DeleteOnClose);
             m_detailWidget->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
             m_detailWidget->setRecordData(diseaseName, diagnosisDate, treatment);
+            m_detailWidget->applyModeSettings(m_currentMode);
 
             connect(m_detailWidget, &QWidget::destroyed, this, [=]() {
                 m_detailWidget = nullptr;

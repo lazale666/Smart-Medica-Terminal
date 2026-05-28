@@ -1,4 +1,4 @@
-﻿
+
 #include "menuwidget.h"
 #include "ui_menuwidget.h"
 #include "settingswidget.h"
@@ -18,7 +18,7 @@ MenuWidget::MenuWidget(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    m_settings = new QSettings("SmartMedica", "settings", this);
+    m_settings = new QSettings("SmartMedica", "Client", this);
     
     socket = new QTcpSocket(this);
     connect(socket, &QTcpSocket::connected, this, &MenuWidget::onSocketConnected);

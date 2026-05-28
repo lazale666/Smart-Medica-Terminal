@@ -23,11 +23,19 @@ DoctorListWidget::DoctorListWidget(const QString &serverIP, int serverPort, cons
 
     connect(socket, &QTcpSocket::connected, this, &DoctorListWidget::requestDoctorList);
     connect(socket, &QTcpSocket::disconnected, this, [=]() {
+        m_isConnecting = false;
+        if (!m_hasActiveSession) {
+            setDoctorSelectionEnabled(true);
+        }
         ui->statusLabel->setText(QStringLiteral("状态：已断开"));
         ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: 700;").arg(ThemeHelpers::statusErrorColor(m_bgColor)));
     });
     connect(socket, &QTcpSocket::readyRead, this, &DoctorListWidget::readData);
     connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::errorOccurred), this, [=](QAbstractSocket::SocketError) {
+        m_isConnecting = false;
+        if (!m_hasActiveSession) {
+            setDoctorSelectionEnabled(true);
+        }
         ui->statusLabel->setText(QStringLiteral("状态：连接失败"));
         ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: 700;").arg(ThemeHelpers::statusErrorColor(m_bgColor)));
     });
@@ -171,6 +179,7 @@ void DoctorListWidget::readData()
                 entry.id = doctorObj.value("id").toInteger();
                 entry.name = doctorObj.value("name").toString();
                 entry.online = doctorObj.value("online").toBool();
+                entry.activeClients = doctorObj.value("active_clients").toInt();
                 m_doctors.append(entry);
             }
 
@@ -182,30 +191,48 @@ void DoctorListWidget::readData()
             });
 
             renderDoctorList();
-            ui->statusLabel->setText(m_doctors.isEmpty() ? QStringLiteral("状态：当前无在线医师") : QStringLiteral("状态：请选择在线医师"));
+            if (!m_isConnecting && !m_hasActiveSession) {
+                ui->statusLabel->setText(m_doctors.isEmpty() ? QStringLiteral("状态：当前无在线医师") : QStringLiteral("状态：请选择在线医师"));
+            }
             ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: 700;")
                                                .arg(m_doctors.isEmpty() ? ThemeHelpers::statusWarnColor(m_bgColor)
                                                                         : ThemeHelpers::statusOkColor(m_bgColor)));
         } else if (type == "connection_success") {
-            ui->statusLabel->setText(QStringLiteral("已连接医师"));
+            m_isConnecting = false;
+            m_hasActiveSession = true;
+            setDoctorSelectionEnabled(false);
+            ui->statusLabel->setText(QStringLiteral("状态：已连接医师"));
             ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: 700;").arg(ThemeHelpers::statusOkColor(m_bgColor)));
 
             disconnect(socket, &QTcpSocket::readyRead, this, &DoctorListWidget::readData);
             const QString doctorName = obj.value("doctor_name").toString(QStringLiteral("医生"));
-            DoctorDialog *dialog = new DoctorDialog(socket, m_username, doctorName, this);
-            dialog->applyAppearance(m_currentMode, m_bgColor, m_fontColor);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->show();
+            m_activeDialog = new DoctorDialog(socket, m_username, doctorName, this);
+            m_activeDialog->applyAppearance(m_currentMode, m_bgColor, m_fontColor);
+            m_activeDialog->setAttribute(Qt::WA_DeleteOnClose);
+            m_activeDialog->show();
 
-            connect(dialog, &QDialog::finished, this, [=]() {
+            connect(m_activeDialog, &QDialog::finished, this, [=]() {
+                m_hasActiveSession = false;
+                m_isConnecting = false;
+                m_selectedDoctorId = -1;
+                m_activeDialog = nullptr;
                 socket->disconnectFromHost();
                 emit backToMenu();
             });
         } else if (type == "waiting_for_doctor") {
+            m_isConnecting = false;
+            setDoctorSelectionEnabled(true);
             ui->statusLabel->setText(QStringLiteral("状态：暂无医师在线，请稍候..."));
             ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: 700;").arg(ThemeHelpers::statusWarnColor(m_bgColor)));
         } else if (type == "connection_failed") {
-            ui->statusLabel->setText(QStringLiteral("状态：连接失败，已刷新列表"));
+            m_isConnecting = false;
+            m_hasActiveSession = false;
+            m_selectedDoctorId = -1;
+            setDoctorSelectionEnabled(true);
+            const QString message = obj.value("message").toString();
+            ui->statusLabel->setText(message.isEmpty()
+                                         ? QStringLiteral("状态：连接失败，已刷新列表")
+                                         : QStringLiteral("状态：%1").arg(message));
             ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: 700;").arg(ThemeHelpers::statusErrorColor(m_bgColor)));
             requestOnlineDoctors();
         }
@@ -214,17 +241,23 @@ void DoctorListWidget::readData()
 
 void DoctorListWidget::onBackBtnClicked()
 {
-    socket->disconnectFromHost();
-    emit backToMenu();
+    closeActiveWindowsAndReturn();
 }
 
 void DoctorListWidget::onDoctorItemClicked(QListWidgetItem *item)
 {
+    if (m_isConnecting || m_hasActiveSession) {
+        return;
+    }
+
     const qint64 doctorId = item->data(Qt::UserRole).toLongLong();
     if (doctorId <= 0) {
         return;
     }
 
+    m_isConnecting = true;
+    m_selectedDoctorId = doctorId;
+    setDoctorSelectionEnabled(false);
     ui->statusLabel->setText(QStringLiteral("状态：正在连接所选医师..."));
     ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: 700;").arg(ThemeHelpers::statusWarnColor(m_bgColor)));
 
@@ -243,7 +276,10 @@ void DoctorListWidget::renderDoctorList()
 
     for (const DoctorListEntry &doctor : m_doctors) {
         const QString statusText = doctor.online ? QStringLiteral("[在线]") : QStringLiteral("[离线]");
-        QListWidgetItem *item = new QListWidgetItem(QString("%1    %2").arg(doctor.name, statusText), ui->doctorList);
+        const QString loadText = doctor.online
+            ? QStringLiteral("当前接诊 %1 人").arg(doctor.activeClients)
+            : QStringLiteral("当前不可接诊");
+        QListWidgetItem *item = new QListWidgetItem(QString("%1    %2\n%3").arg(doctor.name, statusText, loadText), ui->doctorList);
         item->setData(Qt::UserRole, QString::number(doctor.id));
         item->setForeground(doctor.online ? onlineColor : offlineColor);
     }
@@ -257,4 +293,30 @@ void DoctorListWidget::requestOnlineDoctors()
     QJsonObject obj;
     obj["type"] = "get_doctors";
     sendRequest(obj);
+}
+
+void DoctorListWidget::setDoctorSelectionEnabled(bool enabled)
+{
+    ui->doctorList->setEnabled(enabled);
+}
+
+void DoctorListWidget::closeActiveWindowsAndReturn()
+{
+    m_isConnecting = false;
+    m_hasActiveSession = false;
+    m_selectedDoctorId = -1;
+    setDoctorSelectionEnabled(true);
+
+    if (m_activeDialog) {
+        DoctorDialog *dialog = m_activeDialog;
+        m_activeDialog = nullptr;
+        dialog->close();
+    }
+
+    if (socket) {
+        socket->disconnectFromHost();
+    }
+
+    close();
+    emit backToMenu();
 }

@@ -41,6 +41,7 @@ private:
     void switchToPage(int pageIndex);
     void loadSettings();
     void saveSettings();
+    QString scopedKey(const QString &field) const;
     void clearChatHistory();
 };
 

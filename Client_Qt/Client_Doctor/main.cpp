@@ -1,5 +1,6 @@
 #include "doctorchatwidget.h"
 #include "loginwidget.h"
+
 #include <QApplication>
 #include <QString>
 
@@ -87,18 +88,22 @@ int main(int argc, char *argv[])
     LoginWidget *login = new LoginWidget();
     DoctorChatWidget *doctorChat = nullptr;
 
-    QObject::connect(login, &LoginWidget::loginSuccessWithSocket, [&](const QString &username, QTcpSocket *socket) {
+    QObject::connect(login, &LoginWidget::localLoginSuccess, [&](const QString &username, const QString &password) {
         login->hide();
         if (doctorChat) {
             delete doctorChat;
         }
-        doctorChat = new DoctorChatWidget(socket);
-        doctorChat->setUsername(username);
-        doctorChat->setWindowTitle("医生咨询中心 - " + username);
+
+        doctorChat = new DoctorChatWidget();
+        doctorChat->setCredentials(username, password);
+        doctorChat->setWindowTitle(QStringLiteral("医生咨询中心 - %1").arg(username));
+        QObject::connect(doctorChat, &QWidget::destroyed, [&]() {
+            doctorChat = nullptr;
+            login->show();
+        });
         doctorChat->show();
     });
 
     login->show();
-
     return QApplication::exec();
 }

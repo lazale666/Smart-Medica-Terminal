@@ -26,7 +26,7 @@ def fix_file(file_path):
         print(f'Fixed: {file_path}')
 
 def main():
-    directory = r'D:\All Program\agant_example\Smart-Medica-Terminal\Client_Qt\Client'
+    directory = os.path.dirname(os.path.abspath(__file__))
     extensions = ['.cpp', '.h', '.pro']
     
     for root, dirs, files in os.walk(directory):

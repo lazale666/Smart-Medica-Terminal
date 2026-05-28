@@ -7,6 +7,7 @@ import subprocess
 import time
 import sqlite3
 import os
+import uuid
 from langchain_ollama import ChatOllama
 
 logging.basicConfig(
@@ -156,12 +157,14 @@ def get_online_doctors():
         for doctor in doctors:
             if doctor.get('socket') is None:
                 continue
+            active_clients = len(doctor.get('connected_clients', []))
             online_doctors.append({
                 'id': id(doctor['socket']),
                 'name': doctor.get('name', 'Unknown'),
-                'online': True
+                'online': True,
+                'active_clients': active_clients
             })
-            logger.info(f"[DEBUG] Adding doctor: {doctor.get('name', 'Unknown')}")
+            logger.info(f"[DEBUG] Adding doctor: {doctor.get('name', 'Unknown')} with {active_clients} active clients")
     logger.info(f"[DEBUG] Returning {len(online_doctors)} online doctors")
     return online_doctors
 
@@ -170,7 +173,14 @@ def handle_client(client_socket, addr):
     logger.info(f"New client connected: {addr}")
     buffer = b""
     client_socket.settimeout(120)
-    client_info = {'socket': client_socket, 'addr': addr, 'name': None, 'role': 'client'}
+    client_info = {
+        'socket': client_socket,
+        'addr': addr,
+        'name': None,
+        'role': 'client',
+        'current_doctor': None,
+        'connected_clients': []
+    }
     current_doctor = None
     current_client = None
 
@@ -223,6 +233,7 @@ def handle_client(client_socket, addr):
                                 client_info['role'] = role
                                 client_info['current_client'] = None
                                 client_info['current_doctor'] = None
+                                client_info['connected_clients'] = []
                                 
                                 if role == 'doctor':
                                     with clients_lock:
@@ -281,7 +292,15 @@ def handle_client(client_socket, addr):
                                 client_info['name'] = request_username
                             elif not client_info.get('name'):
                                 client_info['name'] = 'Unknown'
-                            
+
+                            if client_info.get('current_doctor') is not None:
+                                send_response(client_socket, {
+                                    'type': 'connection_failed',
+                                    'message': '当前已连接医师，请先结束当前会话'
+                                })
+                                logger.warning(f"Client {client_info.get('name')} attempted duplicate doctor connection")
+                                continue
+                             
                             with clients_lock:
                                 for doctor in doctors:
                                     logger.info(f"[DEBUG] Checking doctor: id={id(doctor['socket'])}, target={doctor_id}")
@@ -292,18 +311,38 @@ def handle_client(client_socket, addr):
                             if target_doctor:
                                 current_doctor = target_doctor
                                 client_info['current_doctor'] = target_doctor
-                                target_doctor['current_client'] = client_info
+                                existing_session = None
+                                for candidate in target_doctor.setdefault('connected_clients', []):
+                                    candidate_client = candidate.get('client', {})
+                                    if candidate_client.get('name') == client_info.get('name'):
+                                        existing_session = candidate
+                                        break
+
+                                if existing_session is None:
+                                    session_id = str(uuid.uuid4())
+                                    target_doctor['connected_clients'].append({
+                                        'session_id': session_id,
+                                        'client': client_info
+                                    })
+                                else:
+                                    session_id = existing_session.get('session_id', str(uuid.uuid4()))
+                                    existing_session['client'] = client_info
+
+                                client_info['doctor_session_id'] = session_id
                                 
                                 send_response(client_socket, {
                                     'type': 'connection_success',
                                     'message': 'Connected to doctor',
-                                    'doctor_name': target_doctor.get('name', 'Unknown')
+                                    'doctor_name': target_doctor.get('name', 'Unknown'),
+                                    'session_id': session_id
                                 })
-                                send_response(target_doctor['socket'], {
-                                    'type': 'new_client',
-                                    'client_name': client_info.get('name', 'Unknown'),
-                                    'username': client_info.get('name', 'Unknown')
-                                })
+                                if existing_session is None:
+                                    send_response(target_doctor['socket'], {
+                                        'type': 'new_client',
+                                        'client_name': client_info.get('name', 'Unknown'),
+                                        'username': client_info.get('name', 'Unknown'),
+                                        'session_id': session_id
+                                    })
                                 logger.info(f"Connected client {client_info.get('name')} with doctor {target_doctor.get('name')}")
                             else:
                                 send_response(client_socket, {'type': 'connection_failed', 'message': 'Doctor not available'})
@@ -320,25 +359,43 @@ def handle_client(client_socket, addr):
                             target_doctor = None
                             
                             with clients_lock:
-                                for doctor in doctors:
-                                    if doctor.get('current_client') is None:
-                                        target_doctor = doctor
-                                        break
+                                if doctors:
+                                    target_doctor = min(doctors, key=lambda doctor: len(doctor.get('connected_clients', [])))
                             
                             if target_doctor:
                                 client_info['current_doctor'] = target_doctor
-                                target_doctor['current_client'] = client_info
+                                existing_session = None
+                                for candidate in target_doctor.setdefault('connected_clients', []):
+                                    candidate_client = candidate.get('client', {})
+                                    if candidate_client.get('name') == client_info.get('name'):
+                                        existing_session = candidate
+                                        break
+
+                                if existing_session is None:
+                                    session_id = str(uuid.uuid4())
+                                    target_doctor['connected_clients'].append({
+                                        'session_id': session_id,
+                                        'client': client_info
+                                    })
+                                else:
+                                    session_id = existing_session.get('session_id', str(uuid.uuid4()))
+                                    existing_session['client'] = client_info
+
+                                client_info['doctor_session_id'] = session_id
                                 
                                 send_response(client_socket, {
                                     'type': 'connection_success',
                                     'message': 'Connected to doctor',
-                                    'doctor_name': target_doctor.get('name', 'Unknown')
+                                    'doctor_name': target_doctor.get('name', 'Unknown'),
+                                    'session_id': session_id
                                 })
-                                send_response(target_doctor['socket'], {
-                                    'type': 'new_client',
-                                    'client_name': client_info.get('name', 'Unknown'),
-                                    'username': client_info.get('name', 'Unknown')
-                                })
+                                if existing_session is None:
+                                    send_response(target_doctor['socket'], {
+                                        'type': 'new_client',
+                                        'client_name': client_info.get('name', 'Unknown'),
+                                        'username': client_info.get('name', 'Unknown'),
+                                        'session_id': session_id
+                                    })
                                 logger.info(f"Auto-connected client {client_info.get('name')} with doctor {target_doctor.get('name')}")
                             else:
                                 send_response(client_socket, {'type': 'waiting_for_doctor', 'message': 'No doctors available, please wait'})
@@ -350,17 +407,38 @@ def handle_client(client_socket, addr):
                                 send_response(client_info['current_doctor']['socket'], {
                                     'type': 'client_message',
                                     'sender': client_info.get('name', 'client'),
+                                    'client_name': client_info.get('name', 'client'),
+                                    'session_id': client_info.get('doctor_session_id', ''),
                                     'message': message
                                 })
                                 logger.info(f"Forwarded message from client {client_info.get('name')} to doctor")
-                            elif client_info['role'] == 'doctor' and client_info.get('current_client'):
+                            elif client_info['role'] == 'doctor':
                                 message = msg_dict.get('message')
-                                send_response(client_info['current_client']['socket'], {
+                                target_session_id = msg_dict.get('target_session_id')
+                                target_client_name = msg_dict.get('target_client') or msg_dict.get('client_name')
+                                target_client = None
+                                for candidate in client_info.get('connected_clients', []):
+                                    if candidate.get('session_id') == target_session_id:
+                                        target_client = candidate.get('client')
+                                        break
+                                if target_client is None:
+                                    send_response(client_socket, {
+                                        'type': 'connection_failed',
+                                        'message': 'Target client not available',
+                                        'target_client': target_client_name,
+                                        'target_session_id': target_session_id
+                                    })
+                                    logger.warning(f"Doctor {client_info.get('name')} attempted to reply to unavailable session: {target_session_id}")
+                                    continue
+
+                                send_response(target_client['socket'], {
                                     'type': 'client_message',
                                     'sender': client_info.get('name', 'doctor'),
+                                    'doctor_name': client_info.get('name', 'doctor'),
+                                    'session_id': target_session_id,
                                     'message': message
                                 })
-                                logger.info(f"Forwarded message from doctor {client_info.get('name')} to client")
+                                logger.info(f"Forwarded message from doctor {client_info.get('name')} to session {target_session_id}")
                             else:
                                 send_response(client_socket, {
                                     'type': 'connection_failed',
@@ -381,14 +459,27 @@ def handle_client(client_socket, addr):
     finally:
         with clients_lock:
             if client_info.get('role') == 'client' and client_info.get('current_doctor'):
+                doctor_info = client_info['current_doctor']
+                doctor_info['connected_clients'] = [
+                    candidate for candidate in doctor_info.get('connected_clients', [])
+                    if candidate.get('client', {}).get('socket') is not client_socket
+                ]
                 send_response(client_info['current_doctor']['socket'], {
                     'type': 'client_disconnected',
                     'client_name': client_info.get('name', 'Unknown'),
-                    'username': client_info.get('name', 'Unknown')
+                    'username': client_info.get('name', 'Unknown'),
+                    'session_id': client_info.get('doctor_session_id', '')
                 })
-                client_info['current_doctor']['current_client'] = None
-            elif client_info.get('role') == 'doctor' and client_info.get('current_client'):
-                client_info['current_client']['current_doctor'] = None
+            elif client_info.get('role') == 'doctor':
+                for connected_client in list(client_info.get('connected_clients', [])):
+                    connected_client['client']['current_doctor'] = None
+                    send_response(connected_client['client']['socket'], {
+                        'type': 'doctor_disconnected',
+                        'doctor_name': client_info.get('name', 'Unknown'),
+                        'message': 'Doctor disconnected',
+                        'session_id': connected_client.get('session_id', '')
+                    })
+                client_info['connected_clients'].clear()
             
             clients[:] = [c for c in clients if c.get('socket') is not client_socket]
             if client_info in doctors:

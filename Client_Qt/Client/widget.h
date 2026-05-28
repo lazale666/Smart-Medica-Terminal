@@ -84,6 +84,12 @@ private:
     void loadSettings();
     void saveSettings();
     void createNewChat();
+    QString historyRootDir() const;
+    QString legacyHistoryDir() const;
+    QString currentUserHistoryDir() const;
+    QString currentUserHistoryFilePath(const QString &fileName) const;
+    QString sanitizeHistoryUserName(const QString &username) const;
+    void clearLegacySharedHistory();
     void saveChatMessage(const QString &role, const QString &content);
     void loadChatHistory(const QString &fileName);
     void refreshHistoryList();
@@ -99,6 +105,11 @@ private:
     void appendHistorySeparator(bool isTop);
     void setSocketHandlersActive(bool active);
     void leaveChatScene(const std::function<void()> &afterCleanup);
+    bool isCurrentUserMember() const;
+    bool consumeFreeConsultQuota();
+    QString findLatestAssistantMessage() const;
+    void updateReadableContentFromHistory();
+    void showThemedMessageBox(QMessageBox::Icon icon, const QString &title, const QString &text);
 
 private:
     Ui::Widget *ui;
@@ -132,6 +143,7 @@ private:
     bool m_isUserNearBottom;
     QString m_firstMessage;
     QString m_lastAssistantMessage;
+    QString m_lastReadableContent;
 };
 
 #endif // WIDGET_H

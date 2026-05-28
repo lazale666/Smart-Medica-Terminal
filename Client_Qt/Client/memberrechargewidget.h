@@ -26,6 +26,7 @@ protected:
 
 signals:
     void backToMenu();
+    void memberStatusChanged(bool isMember);
 
 private slots:
     void onBackBtnClicked();

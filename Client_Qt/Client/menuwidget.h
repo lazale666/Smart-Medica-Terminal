@@ -22,6 +22,7 @@ public:
     void setServerInfo(const QString &ip, int port);
     void disconnectFromServer();
     void ensureServerConnected();
+    void refreshMemberAccessState();
     void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
     void applyFontColor(const QString &color);
@@ -55,6 +56,8 @@ private:
     void saveSettings();
     void updateConnectionStatus();
     void connectToServer();
+    bool isCurrentUserMember() const;
+    void showMemberRequiredMessage();
 
 private:
     Ui::MenuWidget *ui;

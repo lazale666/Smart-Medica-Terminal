@@ -14,11 +14,14 @@ namespace Ui {
 class DoctorListWidget;
 }
 
+class DoctorDialog;
+
 struct DoctorListEntry
 {
     qint64 id;
     QString name;
     bool online;
+    int activeClients = 0;
 };
 
 class DoctorListWidget : public QWidget
@@ -33,6 +36,9 @@ public:
 
 signals:
     void backToMenu();
+
+public slots:
+    void closeActiveWindowsAndReturn();
 
 private slots:
     void connectToServer();
@@ -53,10 +59,15 @@ private:
     QTimer *refreshTimer;
     QByteArray m_buffer;
     QVector<DoctorListEntry> m_doctors;
+    bool m_isConnecting = false;
+    bool m_hasActiveSession = false;
+    qint64 m_selectedDoctorId = -1;
+    DoctorDialog *m_activeDialog = nullptr;
 
     void sendRequest(const QJsonObject &obj);
     void renderDoctorList();
     void requestOnlineDoctors();
+    void setDoctorSelectionEnabled(bool enabled);
 };
 
 #endif // DOCTORLISTWIDGET_H

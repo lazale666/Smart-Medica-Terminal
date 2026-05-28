@@ -3,6 +3,7 @@
 #include "chatmessagewidgets.h"
 #include <QDir>
 #include <QTextStream>
+#include <QDate>
 #include <QDateTime>
 #include <QListWidgetItem>
 #include <QStringConverter>
@@ -26,6 +27,7 @@ Widget::Widget(QWidget *parent)
     , m_newMessageButton(nullptr)
 {
     ui->setupUi(this);
+    ui->readBtn->setText(QStringLiteral("朗读"));
     setupMessageArea();
     socket = new QTcpSocket(this);
     timer = new QTimer(this);
@@ -35,6 +37,11 @@ Widget::Widget(QWidget *parent)
     audio = new Audio(this);
     speech = new Speech();
     m_speech = new QTextToSpeech(this);
+    connect(m_speech, &QTextToSpeech::stateChanged, this, [this](QTextToSpeech::State state) {
+        if (state == QTextToSpeech::Ready || state == QTextToSpeech::Error) {
+            ui->readBtn->setText(QStringLiteral("朗读"));
+        }
+    });
     msg->close();
 
     m_settings = new QSettings("SmartMedica", "Client", this);
@@ -69,6 +76,7 @@ Widget::Widget(QWidget *parent)
     m_isInterrupted = false;
     m_isUserNearBottom = true;
     m_lastAssistantMessage.clear();
+    m_lastReadableContent.clear();
 
     ui->chatTitleLabel->setVisible(true);
     ui->pushButton->setText("发送");
@@ -78,6 +86,7 @@ Widget::Widget(QWidget *parent)
     appendSystemMessage("已进入聊天界面");
     appendSystemMessage("可在设置中配置服务器并手动连接");
 
+    clearLegacySharedHistory();
     createNewChat();
     refreshHistoryList();
 }
@@ -106,6 +115,9 @@ void Widget::setUsername(const QString &username)
 {
     m_username = username;
     ui->userLabel->setText(username);
+    clearLegacySharedHistory();
+    createNewChat();
+    refreshHistoryList();
 }
 
 void Widget::setServerInfo(const QString &ip, int port, bool autoConnect)
@@ -288,15 +300,56 @@ void Widget::connectToServer()
     conFlag = 1;
 }
 
+QString Widget::historyRootDir() const
+{
+    const QString historyDir = QCoreApplication::applicationDirPath() + "/chat_history";
+    QDir().mkpath(historyDir);
+    return historyDir;
+}
+
+QString Widget::legacyHistoryDir() const
+{
+    return historyRootDir() + "/shared";
+}
+
+QString Widget::sanitizeHistoryUserName(const QString &username) const
+{
+    QString safeName = username.trimmed();
+    if (safeName.isEmpty()) {
+        safeName = QStringLiteral("anonymous");
+    }
+    safeName.replace(QRegularExpression(QStringLiteral(R"([\\/:*?"<>|\s]+)")), QStringLiteral("_"));
+    return safeName;
+}
+
+QString Widget::currentUserHistoryDir() const
+{
+    const QString historyDir = historyRootDir() + "/" + sanitizeHistoryUserName(m_username);
+    QDir().mkpath(historyDir);
+    return historyDir;
+}
+
+QString Widget::currentUserHistoryFilePath(const QString &fileName) const
+{
+    return currentUserHistoryDir() + "/" + fileName;
+}
+
+void Widget::clearLegacySharedHistory()
+{
+    QDir dir(legacyHistoryDir());
+    if (!dir.exists()) {
+        return;
+    }
+
+    const QFileInfoList files = dir.entryInfoList(QStringList() << QStringLiteral("chat_*.txt"), QDir::Files);
+    for (const QFileInfo &fileInfo : files) {
+        QFile::remove(fileInfo.absoluteFilePath());
+    }
+}
+
 QString Widget::getHistoryDir() const
 {
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString historyDir = appDir + "/chat_history";
-    QDir dir;
-    if (!dir.exists(historyDir)) {
-        dir.mkpath(historyDir);
-    }
-    return historyDir;
+    return currentUserHistoryDir();
 }
 
 void Widget::setupMessageArea()
@@ -408,9 +461,10 @@ void Widget::createNewChat()
     m_isNewSession = true;
     m_firstMessage.clear();
     m_lastAssistantMessage.clear();
+    m_lastReadableContent.clear();
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
-    m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
+    m_currentChatFile = currentUserHistoryFilePath("chat_" + timestamp + ".txt");
 
     appendSystemMessage("已开启新对话");
     applyFontColor(m_fontColor);
@@ -419,44 +473,44 @@ void Widget::createNewChat()
 void Widget::refreshHistoryList()
 {
     ui->historyList->clear();
-    QDir dir(getHistoryDir());
-    QStringList filters;
-    filters << "chat_*.txt";
+    QDir dir(currentUserHistoryDir());
+    const QStringList filters = { QStringLiteral("chat_*.txt") };
     dir.setNameFilters(filters);
-    QFileInfoList fileList = dir.entryInfoList(QDir::Files, QDir::Time | QDir::Reversed);
+    const QFileInfoList fileList = dir.entryInfoList(QDir::Files, QDir::Time | QDir::Reversed);
 
     for (const QFileInfo &fileInfo : fileList) {
         QFile file(fileInfo.absoluteFilePath());
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QTextStream in(&file);
-            in.setEncoding(QStringConverter::Utf8);
-            QString firstLine = in.readLine();
-            file.close();
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            continue;
+        }
 
-            if (!firstLine.isEmpty()) {
-                QStringList parts = firstLine.split("|");
-                QString displayText;
-                if (parts.size() >= 3 && parts[1] == "我") {
-                    displayText = parts[2].left(20);
-                    if (parts[2].length() > 20) displayText += "...";
-                } else {
-                    displayText = "新对话";
-                }
-                QListWidgetItem *item = new QListWidgetItem(displayText);
-                item->setData(Qt::UserRole, fileInfo.fileName());
-                ui->historyList->addItem(item);
+        QTextStream in(&file);
+        in.setEncoding(QStringConverter::Utf8);
+        const QString firstLine = in.readLine();
+        file.close();
+
+        QString displayText = QStringLiteral("???");
+        if (!firstLine.isEmpty()) {
+            const QStringList parts = firstLine.split('|');
+            if (parts.size() >= 3) {
+                const QString content = parts[2].left(20);
+                displayText = content + (parts[2].length() > 20 ? QStringLiteral("...") : QString());
             }
         }
+
+        QListWidgetItem *item = new QListWidgetItem(displayText, ui->historyList);
+        item->setData(Qt::UserRole, fileInfo.fileName());
     }
 }
 
 void Widget::onHistoryItemClicked(QListWidgetItem *item)
 {
     QString fileName = item->data(Qt::UserRole).toString();
-    m_currentChatFile = getHistoryDir() + "/" + fileName;
+    m_currentChatFile = currentUserHistoryFilePath(fileName);
     m_isNewSession = false;
     clearMessages();
     loadChatHistory(fileName);
+    updateReadableContentFromHistory();
     applyFontColor(m_fontColor);
 }
 
@@ -507,7 +561,8 @@ void Widget::readData()
 
                 m_isThinking = false;
                 ui->pushButton->setText("发送");
-                m_lastAssistantMessage = content;
+                m_lastAssistantMessage = content.trimmed();
+                m_lastReadableContent = m_lastAssistantMessage;
                 appendChatMessage("创伤小组", content, false);
                 saveChatMessage("创伤小组", content);
                 if (!shouldStayPinned) {
@@ -558,6 +613,7 @@ void Widget::on_pushButton_clicked()
 
     QString message = ui->lineEdit->text().trimmed();
     if (message.isEmpty()) return;
+    if (!consumeFreeConsultQuota()) return;
 
     appendChatMessage(m_username.isEmpty() ? "我" : m_username, message, true);
     saveChatMessage("我", message);
@@ -611,6 +667,8 @@ void Widget::on_voiceBtn_released()
 
     QString recognizedText = speech->speechIdentify("record.wav");
     if (!recognizedText.isEmpty()) {
+        if (!consumeFreeConsultQuota()) return;
+
         appendChatMessage(m_username.isEmpty() ? "我" : m_username, recognizedText, true);
         saveChatMessage("我", recognizedText);
         scrollToBottomAndClearReminder();
@@ -669,7 +727,7 @@ void Widget::saveChatMessage(const QString &role, const QString &content)
 
 void Widget::loadChatHistory(const QString &fileName)
 {
-    QString fullPath = getHistoryDir() + "/" + fileName;
+    QString fullPath = currentUserHistoryFilePath(fileName);
     QFile file(fullPath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
 
@@ -784,34 +842,33 @@ void Widget::onSpeechSettingsChanged(double volume, double rate)
 
 void Widget::onReadBtnClicked()
 {
-    if (m_lastAssistantMessage.trimmed().isEmpty()) {
-        QMessageBox::information(nullptr, "提示", "没有可朗读的内容");
+    updateReadableContentFromHistory();
+    const QString readableText = m_lastAssistantMessage.trimmed();
+
+    if (readableText.isEmpty()) {
+        showThemedMessageBox(QMessageBox::Information,
+                             QStringLiteral("提示"),
+                             QStringLiteral("当前没有可朗读的回复内容。"));
         return;
     }
 
     if (m_speech->state() == QTextToSpeech::Speaking) {
         m_speech->stop();
-        ui->readBtn->setText("🔊 朗读");
+        ui->readBtn->setText(QStringLiteral("朗读"));
         return;
     }
 
-    appendSystemMessage("正在朗读...");
+    appendSystemMessage(QStringLiteral("正在朗读..."));
 
     QSettings settings("SmartMedica", "Client");
-    double volume = settings.value("speechVolume", 1.0).toDouble();
-    double rate = settings.value("speechRate", 0.0).toDouble();
+    const double volume = settings.value("speechVolume", 100).toInt() / 100.0;
+    const double rate = settings.value("speechRate", 50).toInt() / 50.0 - 1.0;
 
     m_speech->setVolume(volume);
     m_speech->setRate(rate);
+    ui->readBtn->setText(QStringLiteral("停止朗读"));
 
-    ui->readBtn->setText("⏹️ 停止");
-
-    m_speech->say(m_lastAssistantMessage);
-    connect(m_speech, &QTextToSpeech::stateChanged, this, [=](QTextToSpeech::State state) {
-        if (state == QTextToSpeech::Ready) {
-            ui->readBtn->setText("🔊 朗读");
-        }
-    });
+    m_speech->say(readableText);
 }
 
 void Widget::onCacheCleared()
@@ -821,11 +878,15 @@ void Widget::onCacheCleared()
     m_isNewSession = true;
     m_firstMessage.clear();
     m_lastAssistantMessage.clear();
+    m_lastReadableContent.clear();
 
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
-    m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
+    m_currentChatFile = currentUserHistoryFilePath("chat_" + timestamp + ".txt");
 
     refreshHistoryList();
+    if (settingsWidget) {
+        settingsWidget->setUsername(m_username);
+    }
     scrollToBottomAndClearReminder();
 }
 
@@ -889,4 +950,94 @@ void Widget::leaveChatScene(const std::function<void()> &afterCleanup)
     if (afterCleanup) {
         afterCleanup();
     }
+}
+
+bool Widget::isCurrentUserMember() const
+{
+    if (m_username.trimmed().isEmpty()) {
+        return false;
+    }
+
+    QSettings settings("SmartMedica", "Client");
+    const QString key = QString("member_%1").arg(m_username);
+    return settings.value(key, false).toBool();
+}
+
+bool Widget::consumeFreeConsultQuota()
+{
+    if (isCurrentUserMember()) {
+        return true;
+    }
+
+    const QString userKey = m_username.trimmed().isEmpty() ? QStringLiteral("anonymous") : m_username;
+    const QString dateKey = QString("freeConsultDate_%1").arg(userKey);
+    const QString countKey = QString("freeConsultCount_%1").arg(userKey);
+    const QString today = QDate::currentDate().toString(Qt::ISODate);
+    const QString savedDate = m_settings->value(dateKey).toString();
+    int usedCount = m_settings->value(countKey, 0).toInt();
+
+    if (savedDate != today) {
+        usedCount = 0;
+        m_settings->setValue(dateKey, today);
+        m_settings->setValue(countKey, usedCount);
+    }
+
+    if (usedCount >= 5) {
+        QMessageBox::information(this, QStringLiteral("免费次数已用完"),
+                                 QStringLiteral("非会员每天可免费问诊 5 次，请开通会员后继续使用。"));
+        return false;
+    }
+
+    m_settings->setValue(countKey, usedCount + 1);
+    m_settings->setValue(dateKey, today);
+    m_settings->sync();
+    return true;
+}
+
+QString Widget::findLatestAssistantMessage() const
+{
+    for (auto it = m_messages.crbegin(); it != m_messages.crend(); ++it) {
+        if (!it->isSystem && !it->isSelf) {
+            const QString text = it->message.trimmed();
+            if (!text.isEmpty()) {
+                return text;
+            }
+        }
+    }
+    return QString();
+}
+
+void Widget::updateReadableContentFromHistory()
+{
+    const QString latestAssistantMessage = findLatestAssistantMessage();
+    if (latestAssistantMessage.trimmed().isEmpty()) {
+        m_lastReadableContent.clear();
+        m_lastAssistantMessage.clear();
+        return;
+    }
+
+    m_lastReadableContent = latestAssistantMessage;
+    m_lastAssistantMessage = latestAssistantMessage;
+}
+
+void Widget::showThemedMessageBox(QMessageBox::Icon icon, const QString &title, const QString &text)
+{
+    QMessageBox box(this);
+    box.setIcon(icon);
+    box.setWindowTitle(title);
+    box.setText(text);
+
+    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
+    box.setStyleSheet(QString(
+        "QMessageBox { background: %1; }"
+        "QLabel { color: %2; min-width: 280px; font: 13px \"Microsoft YaHei\"; }"
+        "QPushButton { background: %3; color: %4; border: 1px solid %5; border-radius: 10px; padding: 6px 16px; min-width: 88px; }"
+        "QPushButton:hover { background: %6; }")
+                          .arg(light ? "#F5FBFF" : "#07111F",
+                               light ? "#0F2740" : "#EAFBFF",
+                               light ? "rgba(255,255,255,0.96)" : "rgba(6,24,45,0.92)",
+                               light ? "#0F2740" : "#D8F7FF",
+                               light ? "rgba(15,39,64,0.18)" : "rgba(0,229,255,0.62)",
+                               light ? "rgba(199,244,255,0.96)" : "rgba(0,229,255,0.18)"));
+    box.exec();
 }

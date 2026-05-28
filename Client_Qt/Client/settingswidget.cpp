@@ -1,14 +1,23 @@
 #include "settingswidget.h"
 #include "ui_settingswidget.h"
+#include "resourcepaths.h"
 #include "themehelpers.h"
 
 #include <QColorDialog>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QGroupBox>
+#include <QLabel>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include <QPixmap>
+#include <QPushButton>
+#include <QRegularExpression>
+#include <QSizePolicy>
 #include <QTextStream>
 #include <QStringConverter>
+#include <QVBoxLayout>
 
 SettingsWidget::SettingsWidget(QWidget *parent)
     : QWidget(parent)
@@ -16,10 +25,15 @@ SettingsWidget::SettingsWidget(QWidget *parent)
 {
     ui->setupUi(this);
     setMinimumSize(720, 520);
+    resize(900, 680);
 
     m_settings = new QSettings("SmartMedica", "Client", this);
     m_currentColor = "#D8F7FF";
     m_currentBgColor = "#07111F";
+
+    configureStaticTexts();
+    setupAboutPage();
+    rebuildModePageLayout();
 
     connect(ui->navUserInfoBtn, &QPushButton::clicked, this, &SettingsWidget::onNavUserInfoClicked);
     connect(ui->navModeBtn, &QPushButton::clicked, this, &SettingsWidget::onNavModeClicked);
@@ -44,6 +58,11 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     ui->navUserInfoBtn->setChecked(true);
     switchToPage(0);
     loadSettings();
+
+    if (layout()) {
+        layout()->activate();
+    }
+    adjustSize();
 }
 
 SettingsWidget::~SettingsWidget()
@@ -51,10 +70,187 @@ SettingsWidget::~SettingsWidget()
     delete ui;
 }
 
+void SettingsWidget::configureStaticTexts()
+{
+    setWindowTitle(QStringLiteral("设置"));
+    ui->navUserInfoBtn->setText(QStringLiteral("用户信息"));
+    ui->navModeBtn->setText(QStringLiteral("模式切换"));
+    ui->navCacheBtn->setText(QStringLiteral("缓存管理"));
+    ui->navServerBtn->setText(QStringLiteral("服务器配置"));
+    ui->userIconLabel->setText(QStringLiteral("用户"));
+    ui->usernameLabel->setText(QStringLiteral("用户名"));
+    ui->genderLabel->setText(QStringLiteral("性别："));
+    ui->ageLabel->setText(QStringLiteral("年龄："));
+    ui->genderCombo->setItemText(0, QStringLiteral("男"));
+    ui->genderCombo->setItemText(1, QStringLiteral("女"));
+    ui->genderCombo->setItemText(2, QStringLiteral("保密"));
+    ui->saveUserInfoBtn->setText(QStringLiteral("保存信息"));
+    ui->logoutBtn->setText(QStringLiteral("退出登录"));
+
+    ui->modeLabel->setText(QStringLiteral("选择模式："));
+    ui->modeCombo->setItemText(0, QStringLiteral("普通模式"));
+    ui->modeCombo->setItemText(1, QStringLiteral("极简模式"));
+    ui->modeCombo->setItemText(2, QStringLiteral("关怀模式"));
+    ui->colorLabel->setText(QStringLiteral("字体颜色："));
+    ui->colorBtn->setText(QStringLiteral("选择颜色"));
+    ui->bgColorLabel->setText(QStringLiteral("背景样式："));
+    ui->bgStyleCombo->setItemText(0, QStringLiteral("深色样式"));
+    ui->bgStyleCombo->setItemText(1, QStringLiteral("浅色样式"));
+    ui->bgStyleHintLabel->setText(QStringLiteral("浅色样式会切换为明亮背景与深色文字，深色样式保持当前科技蓝深色界面。"));
+    ui->colorPreview->setText(QStringLiteral("预览效果"));
+    ui->volumeLabel->setText(QStringLiteral("朗读音量："));
+    ui->rateLabel->setText(QStringLiteral("朗读语速："));
+    ui->volumeValueLabel->setText(QStringLiteral("100%"));
+    ui->rateValueLabel->setText(QStringLiteral("中"));
+    ui->modeDescLabel->setText(QStringLiteral("极简模式：隐藏调色功能，界面简洁"));
+    ui->modeDescLabel2->setText(QStringLiteral("普通模式：可调整字体颜色"));
+    ui->modeDescLabel3->setText(QStringLiteral("关怀模式：放大字体，关闭调色功能"));
+
+    ui->cacheLabel->setText(QStringLiteral("缓存管理"));
+    ui->chatRecordGroup->setTitle(QStringLiteral("聊天记录"));
+    ui->selectAllChatBtn->setText(QStringLiteral("全选"));
+    ui->deleteChatBtn->setText(QStringLiteral("删除选中"));
+    ui->medicalRecordGroup->setTitle(QStringLiteral("病例记录"));
+    ui->selectAllMedicalBtn->setText(QStringLiteral("全选"));
+    ui->deleteMedicalBtn->setText(QStringLiteral("删除选中"));
+
+    ui->serverLabel->setText(QStringLiteral("服务器配置"));
+    ui->ipLabel->setText(QStringLiteral("服务器 IP："));
+    ui->portLabel->setText(QStringLiteral("端口号："));
+    ui->autoConnectCheck->setText(QStringLiteral("登录成功后自动连接"));
+    ui->saveServerBtn->setText(QStringLiteral("保存配置"));
+}
+
+void SettingsWidget::setupAboutPage()
+{
+    QPushButton *navAboutBtn = new QPushButton(QStringLiteral("关于我们"), this);
+    navAboutBtn->setObjectName(QStringLiteral("navAboutBtn"));
+    navAboutBtn->setCheckable(true);
+    if (QHBoxLayout *navLayout = qobject_cast<QHBoxLayout *>(ui->navLayout)) {
+        navLayout->insertWidget(4, navAboutBtn);
+    }
+    connect(navAboutBtn, &QPushButton::clicked, this, &SettingsWidget::onNavAboutClicked);
+
+    QWidget *aboutPage = new QWidget(this);
+    aboutPage->setObjectName(QStringLiteral("aboutPage"));
+    QVBoxLayout *aboutLayout = new QVBoxLayout(aboutPage);
+    aboutLayout->setContentsMargins(36, 32, 36, 32);
+    aboutLayout->setSpacing(18);
+
+    QLabel *titleLabel = new QLabel(QStringLiteral("关于我们"), aboutPage);
+    titleLabel->setAlignment(Qt::AlignCenter);
+    QFont titleFont = titleLabel->font();
+    titleFont.setPointSize(20);
+    titleFont.setBold(true);
+    titleLabel->setFont(titleFont);
+
+    QLabel *imageLabel = new QLabel(aboutPage);
+    imageLabel->setAlignment(Qt::AlignCenter);
+    QPixmap pixmap(ResourcePaths::findPhoto("us.png"));
+    if (!pixmap.isNull()) {
+        imageLabel->setPixmap(pixmap.scaled(420, 320, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    } else {
+        imageLabel->setText(QStringLiteral("未找到图片"));
+    }
+
+    QLabel *descTitleLabel = new QLabel(QStringLiteral("创伤小组"), aboutPage);
+    descTitleLabel->setAlignment(Qt::AlignCenter);
+    QFont descTitleFont = descTitleLabel->font();
+    descTitleFont.setPointSize(18);
+    descTitleFont.setBold(true);
+    descTitleLabel->setFont(descTitleFont);
+
+    QLabel *descLabel = new QLabel(QStringLiteral(
+        "七分钟救命，不然退款。这就是创伤小组的保证，投保人在小巷子里血流不止的时候，这种保证格外温暖人心。假设你没有因为失血过多而昏迷，计算着生命最后一刻的每分每秒…不用担心，因为援兵马上就到。首先，你会看到一辆重型装甲浮空车从天而降，用重机枪炮塔把那些想要杀你王八蛋统统撂倒。然后你会看到你的守护天使：一身白绿相间、武装到牙齿医护人员。等创伤小组的人员把你救回来，你会收到需要个人支付的账单。上面可能有一长串的零，但你还是会一脸带笑，再续签半年的保险。\n\n"
+        "创伤小组在全球各大城市提供医疗、护理和撤离服务，备受经济实力富裕人士的高度推崇和追捧。实际上，他们可能是唯一一家公信力如此之高的公司。他们不碰政治，也不会多问。无论情况多么险峻，只要你及时付款，生命就可以获得保障。"),
+        aboutPage);
+    descLabel->setAlignment(Qt::AlignTop);
+    descLabel->setWordWrap(true);
+    descLabel->setTextFormat(Qt::PlainText);
+
+    aboutLayout->addWidget(titleLabel);
+    aboutLayout->addWidget(imageLabel, 1);
+    aboutLayout->addWidget(descTitleLabel);
+    aboutLayout->addWidget(descLabel);
+
+    ui->pageStack->addWidget(aboutPage);
+}
+
+void SettingsWidget::rebuildModePageLayout()
+{
+    ui->modeLayout->setContentsMargins(32, 28, 32, 28);
+    ui->modeLayout->setSpacing(16);
+    ui->colorPreview->setMinimumHeight(132);
+    ui->colorPreview->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    ui->bgStyleHintLabel->setWordWrap(true);
+    ui->modeDescLabel->setWordWrap(true);
+    ui->modeDescLabel2->setWordWrap(true);
+    ui->modeDescLabel3->setWordWrap(true);
+
+    auto *previewGroup = new QGroupBox(QStringLiteral("界面预览"), ui->modePage);
+    auto *previewLayout = new QVBoxLayout(previewGroup);
+    previewLayout->setContentsMargins(16, 18, 16, 16);
+    previewLayout->addWidget(ui->colorPreview);
+
+    auto *speechGroup = new QGroupBox(QStringLiteral("朗读设置"), ui->modePage);
+    auto *speechGroupLayout = new QVBoxLayout(speechGroup);
+    speechGroupLayout->setContentsMargins(16, 18, 16, 16);
+    speechGroupLayout->setSpacing(12);
+    ui->modeLayout->removeItem(ui->speechLayout);
+    ui->modeLayout->removeItem(ui->rateLayout);
+    speechGroupLayout->addLayout(ui->speechLayout);
+    speechGroupLayout->addLayout(ui->rateLayout);
+
+    ui->modeLayout->removeWidget(ui->colorPreview);
+    ui->modeLayout->insertWidget(4, previewGroup);
+    ui->modeLayout->insertWidget(5, speechGroup);
+
+    if (ui->modePage->layout()) {
+        ui->modePage->layout()->activate();
+    }
+}
+
+QString SettingsWidget::historyRootDir() const
+{
+    const QString historyDir = QCoreApplication::applicationDirPath() + "/chat_history";
+    QDir().mkpath(historyDir);
+    return historyDir;
+}
+
+QString SettingsWidget::sanitizeHistoryUserName(const QString &username) const
+{
+    QString safeName = username.trimmed();
+    if (safeName.isEmpty()) {
+        safeName = QStringLiteral("anonymous");
+    }
+    safeName.replace(QRegularExpression(QStringLiteral(R"([\\/:*?"<>|\s]+)")), QStringLiteral("_"));
+    return safeName;
+}
+
+QString SettingsWidget::currentUserHistoryDir() const
+{
+    const QString historyDir = historyRootDir() + "/" + sanitizeHistoryUserName(m_currentUsername);
+    QDir().mkpath(historyDir);
+    return historyDir;
+}
+
+QString SettingsWidget::userScopedKey(const QString &field) const
+{
+    return QStringLiteral("user/%1/%2").arg(sanitizeHistoryUserName(m_currentUsername), field);
+}
+
+QString SettingsWidget::currentUserRecordDir() const
+{
+    const QString recordDir = QDir::homePath() + "/SmartMedica/records/" + sanitizeHistoryUserName(m_currentUsername);
+    QDir().mkpath(recordDir);
+    return recordDir;
+}
+
 void SettingsWidget::setUsername(const QString &username)
 {
     m_currentUsername = username;
     ui->usernameLabel->setText(username);
+    loadSettings();
 }
 
 void SettingsWidget::setServerConfig(const QString &ip, quint16 port, bool autoConnect)
@@ -91,10 +287,7 @@ void SettingsWidget::setBgColor(const QString &color)
 void SettingsWidget::switchToPage(int pageIndex)
 {
     ui->pageStack->setCurrentIndex(pageIndex);
-    ui->navUserInfoBtn->setChecked(pageIndex == 0);
-    ui->navModeBtn->setChecked(pageIndex == 1);
-    ui->navCacheBtn->setChecked(pageIndex == 2);
-    ui->navServerBtn->setChecked(pageIndex == 3);
+    updateNavChecks(pageIndex);
 
     if (pageIndex == 2) {
         loadChatRecords();
@@ -102,16 +295,27 @@ void SettingsWidget::switchToPage(int pageIndex)
     }
 }
 
+void SettingsWidget::updateNavChecks(int pageIndex)
+{
+    ui->navUserInfoBtn->setChecked(pageIndex == 0);
+    ui->navModeBtn->setChecked(pageIndex == 1);
+    ui->navCacheBtn->setChecked(pageIndex == 2);
+    ui->navServerBtn->setChecked(pageIndex == 3);
+    if (QPushButton *navAboutBtn = findChild<QPushButton *>(QStringLiteral("navAboutBtn"))) {
+        navAboutBtn->setChecked(pageIndex == 4);
+    }
+}
+
 void SettingsWidget::loadSettings()
 {
-    const QString mode = m_settings->value("mode", "普通模式").toString();
+    const QString mode = m_settings->value("mode", QStringLiteral("普通模式")).toString();
     const QString bgColor = ThemeHelpers::normalizeBgColor(m_settings->value("bgColor", "#07111F").toString());
     const QString color = m_settings->value("fontColor", ThemeHelpers::defaultFontColorForBg(bgColor)).toString();
     const QString ip = m_settings->value("serverIP", "127.0.0.1").toString();
     const quint16 port = m_settings->value("serverPort", 9999).toUInt();
     const bool autoConnect = m_settings->value("autoConnect", true).toBool();
-    const QString gender = m_settings->value("gender", "保密").toString();
-    const int age = m_settings->value("age", 0).toInt();
+    const QString gender = m_settings->value(userScopedKey(QStringLiteral("gender")), QStringLiteral("保密")).toString();
+    const int age = m_settings->value(userScopedKey(QStringLiteral("age")), 0).toInt();
     const int volume = m_settings->value("speechVolume", 100).toInt();
     const int rate = m_settings->value("speechRate", 50).toInt();
 
@@ -194,6 +398,13 @@ void SettingsWidget::updateTheme()
             border-radius: 14px;
             padding: 8px;
         }
+        QLineEdit, QComboBox, QSpinBox {
+            background: %6;
+            color: %2;
+            border: 1px solid rgba(0, 229, 255, 0.22);
+            border-radius: 14px;
+            padding: 8px 12px;
+        }
         QComboBox QAbstractItemView {
             background: %7;
             color: %2;
@@ -230,17 +441,16 @@ void SettingsWidget::updateTheme()
 
 void SettingsWidget::onSaveUserInfoBtnClicked()
 {
-    m_settings->setValue("gender", ui->genderCombo->currentText());
-    m_settings->setValue("age", ui->ageSpinBox->value());
+    m_settings->setValue(userScopedKey(QStringLiteral("gender")), ui->genderCombo->currentText());
+    m_settings->setValue(userScopedKey(QStringLiteral("age")), ui->ageSpinBox->value());
     m_settings->sync();
-    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("用户信息已保存。"));
+    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("用户信息已保存。"));
 }
 
 void SettingsWidget::loadChatRecords()
 {
     ui->chatRecordList->clear();
-    const QString historyDir = QCoreApplication::applicationDirPath() + "/chat_history";
-    QDir dir(historyDir);
+    QDir dir(currentUserHistoryDir());
     if (!dir.exists()) {
         return;
     }
@@ -257,7 +467,7 @@ void SettingsWidget::loadChatRecords()
             file.close();
             if (!firstLine.isEmpty()) {
                 const QStringList parts = firstLine.split("|");
-                if (parts.size() >= 3 && parts[1] == QStringLiteral("我")) {
+                if (parts.size() >= 3) {
                     displayText = parts[2].left(30);
                     if (parts[2].length() > 30) {
                         displayText += "...";
@@ -266,7 +476,7 @@ void SettingsWidget::loadChatRecords()
             }
         }
 
-        QListWidgetItem *item = new QListWidgetItem(displayText);
+        auto *item = new QListWidgetItem(displayText);
         item->setData(Qt::UserRole, fileInfo.fileName());
         ui->chatRecordList->addItem(item);
     }
@@ -275,7 +485,7 @@ void SettingsWidget::loadChatRecords()
 void SettingsWidget::loadMedicalRecords()
 {
     ui->medicalRecordList->clear();
-    const QString recordDir = QDir::homePath() + "/SmartMedica/records";
+    const QString recordDir = currentUserRecordDir();
     QDir dir(recordDir);
     if (!dir.exists()) {
         return;
@@ -283,7 +493,7 @@ void SettingsWidget::loadMedicalRecords()
 
     const QStringList files = dir.entryList(QStringList() << "record_*.txt", QDir::Files, QDir::Time);
     for (const QString &fileName : files) {
-        QListWidgetItem *item = new QListWidgetItem(fileName);
+        auto *item = new QListWidgetItem(fileName);
         item->setData(Qt::UserRole, fileName);
         ui->medicalRecordList->addItem(item);
     }
@@ -309,11 +519,16 @@ void SettingsWidget::onNavServerClicked()
     switchToPage(3);
 }
 
+void SettingsWidget::onNavAboutClicked()
+{
+    switchToPage(4);
+}
+
 void SettingsWidget::onSaveServerBtnClicked()
 {
     saveSettings();
     emit serverConfigChanged(ui->ipEdit->text(), ui->portEdit->text().toUInt(), ui->autoConnectCheck->isChecked());
-    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
+    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
 }
 
 void SettingsWidget::onCloseBtnClicked()
@@ -340,7 +555,7 @@ void SettingsWidget::onModeChanged(int index)
 
 void SettingsWidget::onColorBtnClicked()
 {
-    QColor color = QColorDialog::getColor(QColor(m_currentColor), this, QStringLiteral("选择字体颜色"));
+    const QColor color = QColorDialog::getColor(QColor(m_currentColor), this, QStringLiteral("选择字体颜色"));
     if (!color.isValid()) {
         return;
     }
@@ -372,12 +587,11 @@ void SettingsWidget::onDeleteChatClicked()
 {
     const QList<QListWidgetItem*> selectedItems = ui->chatRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先选择要删除的聊天记录。"));
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先选择要删除的聊天记录。"));
         return;
     }
 
-    const QString historyDir = QCoreApplication::applicationDirPath() + "/chat_history";
-    QDir dir(historyDir);
+    QDir dir(currentUserHistoryDir());
     int deletedCount = 0;
     for (QListWidgetItem *item : selectedItems) {
         const QString fileName = item->data(Qt::UserRole).toString();
@@ -387,7 +601,8 @@ void SettingsWidget::onDeleteChatClicked()
         }
     }
 
-    QMessageBox::information(nullptr, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条聊天记录。").arg(deletedCount));
+    loadChatRecords();
+    QMessageBox::information(this, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条聊天记录。").arg(deletedCount));
     emit cacheCleared();
 }
 
@@ -402,7 +617,7 @@ void SettingsWidget::onDeleteMedicalClicked()
 {
     const QList<QListWidgetItem*> selectedItems = ui->medicalRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先选择要删除的病例记录。"));
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先选择要删除的病例记录。"));
         return;
     }
 
@@ -417,7 +632,7 @@ void SettingsWidget::onDeleteMedicalClicked()
         }
     }
 
-    QMessageBox::information(nullptr, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条病例记录。").arg(deletedCount));
+    QMessageBox::information(this, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条病例记录。").arg(deletedCount));
 }
 
 void SettingsWidget::onVolumeSliderChanged(int value)

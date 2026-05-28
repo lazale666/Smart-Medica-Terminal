@@ -2,67 +2,89 @@
 <ui version="4.0">
  <class>LoginWidget</class>
  <widget class="QWidget" name="LoginWidget">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>1017</width>
-    <height>398</height>
-   </rect>
-  </property>
   <property name="windowTitle">
-   <string>医生登录 - 医疗智能体</string>
+   <string>夜之城创伤小组 - 医疗智能体</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true"/>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
-    <number>18</number>
+    <number>20</number>
    </property>
    <property name="leftMargin">
     <number>60</number>
    </property>
    <property name="topMargin">
-    <number>42</number>
+    <number>40</number>
    </property>
    <property name="rightMargin">
     <number>60</number>
    </property>
    <property name="bottomMargin">
-    <number>42</number>
+    <number>40</number>
    </property>
    <item>
     <widget class="QLabel" name="titleLabel">
+     <property name="font">
+      <font>
+       <family>Microsoft YaHei</family>
+       <pointsize>28</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
      <property name="text">
-      <string>医生工作站</string>
+      <string>夜之城创伤小组</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignmentFlag::AlignCenter</set>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: white;</string>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QLineEdit" name="usernameEdit">
+     <property name="font">
+      <font>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
      <property name="placeholderText">
-      <string>请输入医生账号</string>
+      <string>请输入用户名</string>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QLineEdit" name="passwordEdit">
+     <property name="font">
+      <font>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
      <property name="echoMode">
-      <enum>QLineEdit::Password</enum>
+      <enum>QLineEdit::EchoMode::Password</enum>
      </property>
      <property name="placeholderText">
-      <string>请输入登录密码</string>
+      <string>请输入密码</string>
      </property>
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="buttonLayout">
+    <layout class="QHBoxLayout" name="horizontalLayout">
      <property name="spacing">
-      <number>18</number>
+      <number>20</number>
      </property>
      <item>
       <widget class="QPushButton" name="loginBtn">
+       <property name="font">
+        <font>
+         <pointsize>12</pointsize>
+         <weight>75</weight>
+         <bold>true</bold>
+        </font>
+       </property>
        <property name="text">
         <string>登录</string>
        </property>
@@ -70,15 +92,15 @@
      </item>
      <item>
       <widget class="QPushButton" name="registerBtn">
+       <property name="font">
+        <font>
+         <pointsize>12</pointsize>
+         <weight>75</weight>
+         <bold>true</bold>
+        </font>
+       </property>
        <property name="text">
         <string>注册</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="clearBtn">
-       <property name="text">
-        <string>清空</string>
        </property>
       </widget>
      </item>

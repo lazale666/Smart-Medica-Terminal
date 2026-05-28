@@ -25,6 +25,7 @@ signals:
     void backToRecharge();
 
 private slots:
+    void onStartBtnClicked();
     void onTimerFirstTimeout();
     void onShowImageTimeout();
     void onBackBtnClicked();

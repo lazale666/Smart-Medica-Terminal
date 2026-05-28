@@ -1,42 +1,34 @@
-
 #include "medicalrecordwidget.h"
 #include "ui_medicalrecordwidget.h"
-#include <QMessageBox>
-#include <QDir>
-#include <QFile>
-#include <QTextStream>
-#include <QListWidgetItem>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QDataStream>
-#include <QFileInfo>
-#include <QStringConverter>
 #include "themehelpers.h"
 
-MedicalRecordWidget::MedicalRecordWidget(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::MedicalRecordWidget),
-    m_serverIP("127.0.0.1"),
-    m_serverPort(9999),
-    m_currentMode("普通模式"),
-    m_isAiThinking(false),
-    m_detailWidget(nullptr),
-    settingsWidget(nullptr),
-    m_fontColor("#D8F7FF"),
-    m_bgColor("#07111F")
+#include <QDataStream>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QListWidgetItem>
+#include <QMessageBox>
+#include <QRegularExpression>
+#include <QStringConverter>
+#include <QTextStream>
+
+MedicalRecordWidget::MedicalRecordWidget(QWidget *parent)
+    : QWidget(parent)
+    , ui(new Ui::MedicalRecordWidget)
+    , m_serverIP("127.0.0.1")
+    , m_serverPort(9999)
+    , m_currentMode(QStringLiteral("普通模式"))
+    , socket(new QTcpSocket(this))
+    , m_isAiThinking(false)
+    , m_detailWidget(nullptr)
+    , settingsWidget(nullptr)
+    , m_fontColor("#D8F7FF")
+    , m_bgColor("#07111F")
 {
     ui->setupUi(this);
-    setStyleSheet(R"(
-        QWidget#MedicalRecordWidget {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
-        }
-        QLabel#titleLabel, QLabel#recordListLabel {
-            color: #00E5FF;
-            font-weight: 700;
-        }
-    )");
 
-    socket = new QTcpSocket(this);
     connect(socket, &QTcpSocket::connected, this, &MedicalRecordWidget::onSocketConnected);
     connect(socket, &QTcpSocket::disconnected, this, &MedicalRecordWidget::onSocketDisconnected);
     connect(socket, &QTcpSocket::readyRead, this, &MedicalRecordWidget::onSocketReadyRead);
@@ -49,7 +41,7 @@ MedicalRecordWidget::MedicalRecordWidget(QWidget *parent) :
     connect(ui->recordList, &QListWidget::itemClicked, this, &MedicalRecordWidget::onRecordListClicked);
 
     ui->dateEdit->setDate(QDate::currentDate());
-
+    applyAppearance(m_currentMode, m_bgColor, m_fontColor);
     refreshRecordList();
 }
 
@@ -71,6 +63,7 @@ void MedicalRecordWidget::setServerInfo(const QString &ip, int port)
 void MedicalRecordWidget::setUsername(const QString &username)
 {
     m_username = username;
+    refreshRecordList();
 }
 
 void MedicalRecordWidget::applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor)
@@ -86,31 +79,18 @@ void MedicalRecordWidget::applyAppearance(const QString &mode, const QString &bg
 void MedicalRecordWidget::applyModeSettings(const QString &mode)
 {
     m_currentMode = mode;
-    
+
     QFont font = ui->diseaseEdit->font();
     QFont labelFont = ui->dateEdit->font();
     QFont btnFont = ui->aiFillBtn->font();
     QFont titleFont = ui->titleLabel->font();
-    
-    if (mode == "关怀模式") {
+
+    if (mode == QStringLiteral("关怀模式")) {
         font.setPointSize(16);
         labelFont.setPointSize(15);
         btnFont.setPointSize(15);
         titleFont.setPointSize(22);
-        
-        ui->diseaseEdit->setFont(font);
-        ui->dateEdit->setFont(labelFont);
-        ui->treatmentEdit->setFont(font);
-        ui->recordList->setFont(font);
-        ui->aiFillBtn->setFont(btnFont);
-        ui->saveBtn->setFont(btnFont);
-        ui->backBtn->setFont(btnFont);
-        ui->settingsBtn->setFont(btnFont);
-        ui->titleLabel->setFont(titleFont);
-        ui->recordListLabel->setFont(titleFont);
-        ui->diseaseLabel->setFont(labelFont);
-        ui->dateLabel->setFont(labelFont);
-        ui->treatmentLabel->setFont(labelFont);
+
         ui->aiFillBtn->setMinimumHeight(52);
         ui->saveBtn->setMinimumHeight(52);
         ui->backBtn->setMinimumHeight(52);
@@ -121,26 +101,27 @@ void MedicalRecordWidget::applyModeSettings(const QString &mode)
         labelFont.setPointSize(10);
         btnFont.setPointSize(10);
         titleFont.setPointSize(14);
-        
-        ui->diseaseEdit->setFont(font);
-        ui->dateEdit->setFont(labelFont);
-        ui->treatmentEdit->setFont(font);
-        ui->recordList->setFont(font);
-        ui->aiFillBtn->setFont(btnFont);
-        ui->saveBtn->setFont(btnFont);
-        ui->backBtn->setFont(btnFont);
-        ui->settingsBtn->setFont(btnFont);
-        ui->titleLabel->setFont(titleFont);
-        ui->recordListLabel->setFont(titleFont);
-        ui->diseaseLabel->setFont(labelFont);
-        ui->dateLabel->setFont(labelFont);
-        ui->treatmentLabel->setFont(labelFont);
+
         ui->aiFillBtn->setMinimumHeight(36);
         ui->saveBtn->setMinimumHeight(36);
         ui->backBtn->setMinimumHeight(36);
         ui->settingsBtn->setMinimumHeight(36);
         ui->recordList->setSpacing(4);
     }
+
+    ui->diseaseEdit->setFont(font);
+    ui->dateEdit->setFont(labelFont);
+    ui->treatmentEdit->setFont(font);
+    ui->recordList->setFont(font);
+    ui->aiFillBtn->setFont(btnFont);
+    ui->saveBtn->setFont(btnFont);
+    ui->backBtn->setFont(btnFont);
+    ui->settingsBtn->setFont(btnFont);
+    ui->titleLabel->setFont(titleFont);
+    ui->recordListLabel->setFont(titleFont);
+    ui->diseaseLabel->setFont(labelFont);
+    ui->dateLabel->setFont(labelFont);
+    ui->treatmentLabel->setFont(labelFont);
 }
 
 void MedicalRecordWidget::applyFontColor(const QString &color)
@@ -258,23 +239,23 @@ void MedicalRecordWidget::onBgColorChanged(const QString &color)
 
 void MedicalRecordWidget::onAiFillBtnClicked()
 {
-    QString diseaseName = ui->diseaseEdit->text().trimmed();
+    const QString diseaseName = ui->diseaseEdit->text().trimmed();
     if (diseaseName.isEmpty()) {
-        QMessageBox::warning(nullptr, "提示", "请先输入疾病名称");
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先输入疾病名称。"));
         return;
     }
 
     if (m_isAiThinking) {
-        QMessageBox::warning(nullptr, "提示", "AI正在思考中，请等待");
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("AI 正在思考中，请稍候。"));
         return;
     }
 
     m_isAiThinking = true;
     ui->aiFillBtn->setEnabled(false);
     ui->saveBtn->setEnabled(false);
-    ui->statusLabel->setText("状态：AI正在思考...");
+    ui->statusLabel->setText(QStringLiteral("状态：AI 正在思考..."));
 
-    QString question = QString("我得了%1，我该怎么办？直接为我提供治疗建议").arg(diseaseName);
+    const QString question = QStringLiteral("我得了 %1，我该怎么办？直接为我提供治疗建议").arg(diseaseName);
 
     if (socket->state() != QTcpSocket::ConnectedState) {
         socket->connectToHost(m_serverIP, m_serverPort);
@@ -284,7 +265,7 @@ void MedicalRecordWidget::onAiFillBtnClicked()
     obj["type"] = "message";
     obj["data"] = question;
 
-    QByteArray jsonData = QJsonDocument(obj).toJson(QJsonDocument::Compact);
+    const QByteArray jsonData = QJsonDocument(obj).toJson(QJsonDocument::Compact);
     QByteArray packet;
     QDataStream stream(&packet, QIODevice::WriteOnly);
     stream.setByteOrder(QDataStream::BigEndian);
@@ -297,22 +278,22 @@ void MedicalRecordWidget::onAiFillBtnClicked()
 
 void MedicalRecordWidget::onSaveBtnClicked()
 {
-    QString diseaseName = ui->diseaseEdit->text().trimmed();
-    QString diagnosisDate = ui->dateEdit->date().toString("yyyy-MM-dd");
-    QString treatment = ui->treatmentEdit->toPlainText().trimmed();
+    const QString diseaseName = ui->diseaseEdit->text().trimmed();
+    const QString diagnosisDate = ui->dateEdit->date().toString("yyyy-MM-dd");
+    const QString treatment = ui->treatmentEdit->toPlainText().trimmed();
 
     if (diseaseName.isEmpty()) {
-        QMessageBox::warning(nullptr, "提示", "请输入疾病名称");
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请输入疾病名称。"));
         return;
     }
 
     if (treatment.isEmpty()) {
-        QMessageBox::warning(nullptr, "提示", "请填写治疗建议");
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请填写治疗建议。"));
         return;
     }
 
     saveRecord(diseaseName, diagnosisDate, treatment);
-    QMessageBox::information(nullptr, "提示", "病例保存成功");
+    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("病例保存成功。"));
 
     ui->diseaseEdit->clear();
     ui->dateEdit->setDate(QDate::currentDate());
@@ -328,76 +309,78 @@ void MedicalRecordWidget::onBackBtnClicked()
 
 void MedicalRecordWidget::onRecordListClicked(QListWidgetItem *item)
 {
-    QString fileName = item->data(Qt::UserRole).toString();
-    if (!fileName.isEmpty()) {
-        QString diseaseName, diagnosisDate, treatment;
-        loadRecordData(fileName, diseaseName, diagnosisDate, treatment);
-
-        if (!diseaseName.isEmpty()) {
-            if (m_detailWidget) {
-                m_detailWidget->deleteLater();
-                m_detailWidget = nullptr;
-            }
-            m_detailWidget = new RecordDetailWidget(nullptr);
-            m_detailWidget->setAttribute(Qt::WA_DeleteOnClose);
-            m_detailWidget->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
-            m_detailWidget->setRecordData(diseaseName, diagnosisDate, treatment);
-            m_detailWidget->applyAppearance(m_currentMode, m_bgColor, m_fontColor);
-
-            connect(m_detailWidget, &QWidget::destroyed, this, [=]() {
-                m_detailWidget = nullptr;
-            });
-
-            m_detailWidget->show();
-            m_detailWidget->raise();
-            m_detailWidget->activateWindow();
-        }
+    const QString fileName = item->data(Qt::UserRole).toString();
+    if (fileName.isEmpty()) {
+        return;
     }
+
+    QString diseaseName;
+    QString diagnosisDate;
+    QString treatment;
+    loadRecordData(fileName, diseaseName, diagnosisDate, treatment);
+
+    if (diseaseName.isEmpty()) {
+        return;
+    }
+
+    if (m_detailWidget) {
+        m_detailWidget->deleteLater();
+        m_detailWidget = nullptr;
+    }
+
+    m_detailWidget = new RecordDetailWidget(nullptr);
+    m_detailWidget->setAttribute(Qt::WA_DeleteOnClose);
+    m_detailWidget->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    m_detailWidget->setRecordData(diseaseName, diagnosisDate, treatment);
+    m_detailWidget->applyAppearance(m_currentMode, m_bgColor, m_fontColor);
+
+    connect(m_detailWidget, &QWidget::destroyed, this, [=]() {
+        m_detailWidget = nullptr;
+    });
+
+    m_detailWidget->show();
+    m_detailWidget->raise();
+    m_detailWidget->activateWindow();
 }
 
 void MedicalRecordWidget::loadRecordData(const QString &fileName, QString &diseaseName, QString &diagnosisDate, QString &treatment)
 {
-    QString filePath = getRecordDir() + "/" + fileName;
-
+    const QString filePath = getRecordDir() + "/" + fileName;
     QFile file(filePath);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        diseaseName.clear();
-        diagnosisDate.clear();
-        treatment.clear();
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return;
+    }
 
-        QStringList allLines;
-        QTextStream in(&file);
-        while (!in.atEnd()) {
-            allLines << in.readLine();
-        }
-        file.close();
+    diseaseName.clear();
+    diagnosisDate.clear();
+    treatment.clear();
 
-        bool inTreatment = false;
-
-        for (int i = 0; i < allLines.size(); i++) {
-            QString line = allLines[i];
-            if (line.startsWith("疾病名称:")) {
-                diseaseName = line.mid(5);
-            } else if (line.startsWith("诊断日期:")) {
-                diagnosisDate = line.mid(5);
-            } else if (line.startsWith("治疗建议:")) {
-                inTreatment = true;
-                treatment = line.mid(5);
-            } else if (inTreatment && !line.isEmpty()) {
-                treatment += "\n" + line;
-            }
+    QTextStream in(&file);
+    in.setEncoding(QStringConverter::Utf8);
+    bool inTreatment = false;
+    while (!in.atEnd()) {
+        const QString line = in.readLine();
+        if (line.startsWith(QStringLiteral("疾病名称:"))) {
+            diseaseName = line.mid(QStringLiteral("疾病名称:").size());
+        } else if (line.startsWith(QStringLiteral("诊断日期:"))) {
+            diagnosisDate = line.mid(QStringLiteral("诊断日期:").size());
+        } else if (line.startsWith(QStringLiteral("治疗建议:"))) {
+            inTreatment = true;
+            treatment = line.mid(QStringLiteral("治疗建议:").size());
+        } else if (inTreatment) {
+            treatment += "\n" + line;
         }
     }
 }
 
 void MedicalRecordWidget::onSocketConnected()
 {
-    ui->statusLabel->setText("状态：已连接服务器");
+    ui->statusLabel->setText(QStringLiteral("状态：已连接服务器"));
 }
 
 void MedicalRecordWidget::onSocketDisconnected()
 {
-    ui->statusLabel->setText("状态：已断开服务器");
+    ui->statusLabel->setText(QStringLiteral("状态：已断开服务器"));
 }
 
 void MedicalRecordWidget::onSocketReadyRead()
@@ -405,40 +388,44 @@ void MedicalRecordWidget::onSocketReadyRead()
     m_buffer.append(socket->readAll());
 
     while (true) {
-        if (m_buffer.size() < 4) break;
+        if (m_buffer.size() < 4) {
+            break;
+        }
 
-        quint32 dataLen = qFromBigEndian<quint32>(reinterpret_cast<uchar*>(m_buffer.data()));
-        qint32 totalLen = 4 + dataLen;
+        const quint32 dataLen = qFromBigEndian<quint32>(reinterpret_cast<uchar*>(m_buffer.data()));
+        const qint32 totalLen = 4 + dataLen;
+        if (m_buffer.size() < totalLen) {
+            break;
+        }
 
-        if (m_buffer.size() < totalLen) break;
-
-        QByteArray jsonData = m_buffer.mid(4, dataLen);
+        const QByteArray jsonData = m_buffer.mid(4, dataLen);
         m_buffer = m_buffer.mid(totalLen);
 
         QJsonParseError parseError;
-        QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+        const QJsonDocument doc = QJsonDocument::fromJson(jsonData, &parseError);
+        if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+            continue;
+        }
 
-        if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
-            QJsonObject obj = doc.object();
-            QString type = obj.value("type").toString();
-            QJsonValue value;
+        const QJsonObject obj = doc.object();
+        const QString type = obj.value("type").toString();
+        QJsonValue value;
 
-            if (type == "ai_response")
-                value = obj.value("data");
-            else if (type == "message")
-                value = obj.value("message");
+        if (type == "ai_response") {
+            value = obj.value("data");
+        } else if (type == "message") {
+            value = obj.value("message");
+        }
 
-            if (value.isString()) {
-                QString content = value.toString();
-                ui->treatmentEdit->setPlainText(content);
-            }
+        if (value.isString()) {
+            ui->treatmentEdit->setPlainText(value.toString());
         }
     }
 
     m_isAiThinking = false;
     ui->aiFillBtn->setEnabled(true);
     ui->saveBtn->setEnabled(true);
-    ui->statusLabel->setText("状态：AI建议已生成");
+    ui->statusLabel->setText(QStringLiteral("状态：AI 建议已生成"));
 }
 
 void MedicalRecordWidget::onSocketError(QAbstractSocket::SocketError error)
@@ -447,8 +434,8 @@ void MedicalRecordWidget::onSocketError(QAbstractSocket::SocketError error)
     m_isAiThinking = false;
     ui->aiFillBtn->setEnabled(true);
     ui->saveBtn->setEnabled(true);
-    ui->statusLabel->setText("状态：连接失败");
-    QMessageBox::warning(nullptr, "错误", "无法连接到服务器：" + socket->errorString());
+    ui->statusLabel->setText(QStringLiteral("状态：连接失败"));
+    QMessageBox::warning(this, QStringLiteral("错误"), QStringLiteral("无法连接到服务器：") + socket->errorString());
 }
 
 void MedicalRecordWidget::refreshRecordList()
@@ -460,25 +447,22 @@ void MedicalRecordWidget::refreshRecordList()
         return;
     }
 
-    QStringList filters;
-    filters << "record_*.txt";
-    QStringList files = recordDir.entryList(filters, QDir::Files, QDir::Time);
-
+    const QStringList files = recordDir.entryList(QStringList() << "record_*.txt", QDir::Files, QDir::Time);
     for (const QString &file : files) {
         QFileInfo fi(recordDir.filePath(file));
-        QString displayText = file.mid(7, 8) + " " + file.mid(15, 4) + " - ";
+        QString displayText = file.mid(7, 8) + " " + file.mid(16, 6) + " - ";
 
         QFile recordFile(fi.absoluteFilePath());
         if (recordFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&recordFile);
-            QString line = in.readLine();
-            if (line.startsWith("疾病名称:")) {
-                displayText += line.mid(5);
+            in.setEncoding(QStringConverter::Utf8);
+            const QString line = in.readLine();
+            if (line.startsWith(QStringLiteral("疾病名称:"))) {
+                displayText += line.mid(QStringLiteral("疾病名称:").size());
             }
-            recordFile.close();
         }
 
-        QListWidgetItem *item = new QListWidgetItem(displayText);
+        auto *item = new QListWidgetItem(displayText);
         item->setData(Qt::UserRole, file);
         ui->recordList->addItem(item);
     }
@@ -486,9 +470,9 @@ void MedicalRecordWidget::refreshRecordList()
 
 void MedicalRecordWidget::saveRecord(const QString &diseaseName, const QString &diagnosisDate, const QString &treatment)
 {
-    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
-    QString fileName = "record_" + timestamp + ".txt";
-    QString filePath = getRecordDir() + "/" + fileName;
+    const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    const QString fileName = "record_" + timestamp + ".txt";
+    const QString filePath = getRecordDir() + "/" + fileName;
 
     QDir().mkpath(getRecordDir());
 
@@ -496,60 +480,35 @@ void MedicalRecordWidget::saveRecord(const QString &diseaseName, const QString &
     if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         QTextStream out(&file);
         out.setEncoding(QStringConverter::Utf8);
-        out << "疾病名称:" << diseaseName << "\n";
-        out << "诊断日期:" << diagnosisDate << "\n";
-        out << "治疗建议:" << treatment << "\n";
-        file.close();
+        out << QStringLiteral("疾病名称:") << diseaseName << "\n";
+        out << QStringLiteral("诊断日期:") << diagnosisDate << "\n";
+        out << QStringLiteral("治疗建议:") << treatment << "\n";
     }
 }
 
 void MedicalRecordWidget::loadRecord(const QString &fileName)
 {
-    QString filePath = getRecordDir() + "/" + fileName;
+    QString diseaseName;
+    QString diagnosisDate;
+    QString treatment;
+    loadRecordData(fileName, diseaseName, diagnosisDate, treatment);
 
-    QFile file(filePath);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        ui->diseaseEdit->clear();
-        ui->dateEdit->clear();
-        ui->treatmentEdit->clear();
-        
-        QStringList allLines;
-        QTextStream in(&file);
-        while (!in.atEnd()) {
-            allLines << in.readLine();
-        }
-        file.close();
-        
-        QString diseaseName, diagnosisDate, treatment;
-        bool inTreatment = false;
-        
-        for (int i = 0; i < allLines.size(); i++) {
-            QString line = allLines[i];
-            if (line.startsWith("疾病名称:")) {
-                diseaseName = line.mid(5);
-            } else if (line.startsWith("诊断日期:")) {
-                diagnosisDate = line.mid(5);
-            } else if (line.startsWith("治疗建议:")) {
-                inTreatment = true;
-                treatment = line.mid(5);
-            } else if (inTreatment && !line.isEmpty()) {
-                treatment += "\n" + line;
-            }
-        }
-        
-        if (!diseaseName.isEmpty()) {
-            ui->diseaseEdit->setText(diseaseName);
-        }
-        if (!diagnosisDate.isEmpty()) {
-            ui->dateEdit->setDate(QDate::fromString(diagnosisDate, "yyyy-MM-dd"));
-        }
-        if (!treatment.isEmpty()) {
-            ui->treatmentEdit->setPlainText(treatment);
-        }
+    ui->diseaseEdit->setText(diseaseName);
+    ui->dateEdit->setDate(QDate::fromString(diagnosisDate, "yyyy-MM-dd"));
+    ui->treatmentEdit->setPlainText(treatment);
+}
+
+QString MedicalRecordWidget::sanitizeUserName(const QString &username) const
+{
+    QString safeName = username.trimmed();
+    if (safeName.isEmpty()) {
+        safeName = QStringLiteral("anonymous");
     }
+    safeName.replace(QRegularExpression(QStringLiteral(R"([\\/:*?"<>|\s]+)")), QStringLiteral("_"));
+    return safeName;
 }
 
 QString MedicalRecordWidget::getRecordDir() const
 {
-    return QDir::homePath() + "/SmartMedica/records";
+    return QDir::homePath() + "/SmartMedica/records/" + sanitizeUserName(m_username);
 }

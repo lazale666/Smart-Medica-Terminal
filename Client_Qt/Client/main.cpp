@@ -272,7 +272,11 @@ int main(int argc, char *argv[])
         doctorList->setWindowTitle("医疗智能体 - 名医对话");
 
         QObject::connect(doctorList, &DoctorListWidget::backToMenu, [&]() {
-            doctorList->hide();
+            if (doctorList) {
+                doctorList->close();
+                doctorList->deleteLater();
+                doctorList = nullptr;
+            }
             menu->show();
         });
 
@@ -296,7 +300,12 @@ int main(int argc, char *argv[])
 
         QObject::connect(memberRecharge, &MemberRechargeWidget::backToMenu, [&]() {
             memberRecharge->hide();
+            menu->refreshMemberAccessState();
             menu->show();
+        });
+
+        QObject::connect(memberRecharge, &MemberRechargeWidget::memberStatusChanged, [&](bool) {
+            menu->refreshMemberAccessState();
         });
 
         memberRecharge->show();

@@ -37,6 +37,7 @@ HEADERS += \
     menuwidget.h \
     medicalrecordwidget.h \
     recorddetailwidget.h \
+    resourcepaths.h \
     settingswidget.h \
     speech.h \
     widget.h

@@ -36,6 +36,7 @@ private:
     bool loadUsers();
     bool saveUsers();
     void updateBackground();
+    void showDisclaimerDialog();
 
     QJsonObject users;
     QString m_bgPath;

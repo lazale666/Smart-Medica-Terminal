@@ -3,6 +3,7 @@
 #include "settingswidget.h"
 #include "themehelpers.h"
 
+#include <QMessageBox>
 #include <QShowEvent>
 
 MenuWidget::MenuWidget(QWidget *parent) :
@@ -43,6 +44,7 @@ MenuWidget::~MenuWidget()
 void MenuWidget::setUsername(const QString &username)
 {
     m_username = username;
+    refreshMemberAccessState();
     ui->userLabel->setText(QStringLiteral("当前用户：") + username);
 }
 
@@ -67,6 +69,7 @@ void MenuWidget::disconnectFromServer()
 void MenuWidget::ensureServerConnected()
 {
     loadSettings();
+    refreshMemberAccessState();
     if (m_autoConnect) {
         connectToServer();
     } else {
@@ -201,6 +204,10 @@ void MenuWidget::onChatBtnClicked()
 
 void MenuWidget::onMedicalRecordBtnClicked()
 {
+    if (!isCurrentUserMember()) {
+        showMemberRequiredMessage();
+        return;
+    }
     emit openMedicalRecord(m_serverIP, m_serverPort, m_autoConnect);
 }
 
@@ -208,6 +215,8 @@ void MenuWidget::onSettingsBtnClicked()
 {
     SettingsWidget *settings = new SettingsWidget();
     settings->setAttribute(Qt::WA_DeleteOnClose);
+    settings->setUsername(m_username);
+    settings->setServerConfig(m_serverIP, m_serverPort, m_autoConnect);
     settings->setCurrentMode(m_currentMode);
     settings->setBgColor(m_bgColor);
     settings->setFontColor(m_fontColor);
@@ -282,6 +291,7 @@ void MenuWidget::loadSettings()
     m_fontColor = m_settings->value("fontColor", ThemeHelpers::defaultFontColorForBg(m_bgColor)).toString();
     m_currentMode = m_settings->value("mode", "普通模式").toString();
     applyAppearance(m_currentMode, m_bgColor, m_fontColor);
+    refreshMemberAccessState();
 }
 
 void MenuWidget::saveSettings()
@@ -320,6 +330,7 @@ void MenuWidget::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     loadSettings();
+    refreshMemberAccessState();
     if (m_autoConnect) {
         connectToServer();
     }
@@ -327,10 +338,38 @@ void MenuWidget::showEvent(QShowEvent *event)
 
 void MenuWidget::onDoctorChatBtnClicked()
 {
+    if (!isCurrentUserMember()) {
+        showMemberRequiredMessage();
+        return;
+    }
     emit openDoctorChat(m_serverIP, m_serverPort);
 }
 
 void MenuWidget::onMemberRechargeBtnClicked()
 {
     emit openMemberRecharge();
+}
+
+bool MenuWidget::isCurrentUserMember() const
+{
+    if (m_username.trimmed().isEmpty()) {
+        return false;
+    }
+
+    const QString key = QString("member_%1").arg(m_username);
+    return m_settings->value(key, false).toBool();
+}
+
+void MenuWidget::refreshMemberAccessState()
+{
+    const bool isMember = isCurrentUserMember();
+    ui->medicalRecordBtn->setEnabled(isMember);
+    ui->doctorChatBtn->setEnabled(isMember);
+    ui->medicalRecordBtn->setToolTip(isMember ? QString() : QStringLiteral("开通会员后可使用病历记录"));
+    ui->doctorChatBtn->setToolTip(isMember ? QString() : QStringLiteral("开通会员后可使用名医对话"));
+}
+
+void MenuWidget::showMemberRequiredMessage()
+{
+    QMessageBox::information(this, QStringLiteral("会员功能"), QStringLiteral("请先开通会员后再使用该功能。"));
 }

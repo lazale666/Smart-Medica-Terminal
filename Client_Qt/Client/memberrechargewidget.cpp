@@ -1,15 +1,13 @@
 #include "memberrechargewidget.h"
 #include "ui_memberrechargewidget.h"
 #include "facerecognizewidget.h"
+#include "resourcepaths.h"
 #include "themehelpers.h"
 
-#include <QCoreApplication>
-#include <QFileInfo>
 #include <QMessageBox>
 #include <QPalette>
 #include <QPixmap>
 #include <QBrush>
-
 MemberRechargeWidget::MemberRechargeWidget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::MemberRechargeWidget)
@@ -20,10 +18,7 @@ MemberRechargeWidget::MemberRechargeWidget(QWidget *parent)
     , m_fontColor("#D8F7FF")
 {
     ui->setupUi(this);
-    m_bgPath = QCoreApplication::applicationDirPath() + "/photo/pay_money_background.png";
-    if (!QFileInfo::exists(m_bgPath)) {
-        m_bgPath = "D:/All Program/agant_example/Smart-Medica-Terminal/Client_Qt/Client/photo/pay_money_background.png";
-    }
+    m_bgPath = ResourcePaths::findPhoto("pay_money_background.png");
 
     setFixedSize(m_lockedSize);
     m_settings = new QSettings("SmartMedica", "Client", this);
@@ -164,33 +159,39 @@ void MemberRechargeWidget::onPurchaseBtnClicked()
         return;
     }
 
-    FaceRecognizeWidget *faceWidget = new FaceRecognizeWidget(m_username, this);
+    FaceRecognizeWidget *faceWidget = new FaceRecognizeWidget(m_username, nullptr);
     faceWidget->applyAppearance(m_currentMode, m_currentBgColor, m_fontColor);
     connect(faceWidget, &FaceRecognizeWidget::recognitionSuccess, [=]() {
         m_isMember = true;
         saveMemberStatus();
         loadMemberStatus();
+        emit memberStatusChanged(true);
         QMessageBox::information(nullptr, QStringLiteral("恭喜"), QStringLiteral("会员开通成功。"));
     });
     connect(faceWidget, &FaceRecognizeWidget::backToRecharge, [=]() {
         faceWidget->close();
     });
     faceWidget->show();
+    faceWidget->raise();
+    faceWidget->activateWindow();
 }
 
 void MemberRechargeWidget::updateBackground()
 {
+    QPalette palette;
     if (m_bgPath.isEmpty()) {
+        palette.setBrush(QPalette::Window, QBrush(QColor(ThemeHelpers::isLightTheme(m_currentBgColor) ? "#F5FBFF" : "#07111F")));
+        setPalette(palette);
+        setAutoFillBackground(true);
         return;
     }
 
     QPixmap background(m_bgPath);
     if (background.isNull()) {
-        return;
+        palette.setBrush(QPalette::Window, QBrush(QColor(ThemeHelpers::isLightTheme(m_currentBgColor) ? "#F5FBFF" : "#07111F")));
+    } else {
+        palette.setBrush(QPalette::Window, QBrush(background.scaled(size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
     }
-
-    QPalette palette;
-    palette.setBrush(QPalette::Window, QBrush(background.scaled(size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
     setPalette(palette);
     setAutoFillBackground(true);
 }

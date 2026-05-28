@@ -1,35 +1,45 @@
 #include "loginwidget.h"
 #include "ui_loginwidget.h"
+#include "resourcepaths.h"
 #include "themehelpers.h"
 
-#include <QCoreApplication>
+#include <QDialog>
 #include <QFile>
-#include <QFileInfo>
 #include <QJsonDocument>
+#include <QLabel>
 #include <QPalette>
 #include <QPixmap>
+#include <QPushButton>
 #include <QResizeEvent>
+#include <QVBoxLayout>
 
 LoginWidget::LoginWidget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::LoginWidget)
-    , m_bgPath("")
+    , m_bgPath(QString())
     , m_bgColor("#07111F")
     , m_fontColor("#D8F7FF")
 {
     ui->setupUi(this);
     loadUsers();
 
-    QString bgPath = QCoreApplication::applicationDirPath() + "/photo/background.png";
-    QFileInfo fileInfo(bgPath);
-    if (!fileInfo.exists() || !fileInfo.isFile()) {
-        bgPath = "D:/All Program/agant_example/Smart-Medica-Terminal/Client_Qt/Client/photo/background.png";
-    }
-    m_bgPath = bgPath;
+    m_bgPath = ResourcePaths::findPhoto("background.png");
 
     setFixedSize(1017, 398);
+    ui->usernameEdit->setMaximumWidth(420);
+    ui->passwordEdit->setMaximumWidth(420);
+    ui->loginBtn->setFixedWidth(170);
+    ui->registerBtn->setFixedWidth(170);
+    ui->verticalLayout->setAlignment(ui->usernameEdit, Qt::AlignHCenter);
+    ui->verticalLayout->setAlignment(ui->passwordEdit, Qt::AlignHCenter);
+    ui->verticalLayout->setAlignment(ui->horizontalLayout, Qt::AlignHCenter);
     applyAppearance(m_bgColor, m_fontColor);
     updateBackground();
+}
+
+LoginWidget::~LoginWidget()
+{
+    delete ui;
 }
 
 void LoginWidget::resizeEvent(QResizeEvent *event)
@@ -85,22 +95,15 @@ void LoginWidget::applyAppearance(const QString &bgColor, const QString &fontCol
 
 void LoginWidget::updateBackground()
 {
-    if (m_bgPath.isEmpty()) {
-        return;
-    }
-
+    QPalette palette;
     QPixmap background(m_bgPath);
-    if (!background.isNull()) {
-        QPalette palette;
+    if (!m_bgPath.isEmpty() && !background.isNull()) {
         palette.setBrush(QPalette::Window, QBrush(background.scaled(size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
-        setPalette(palette);
-        setAutoFillBackground(true);
+    } else {
+        palette.setBrush(QPalette::Window, QBrush(QColor("#07111F")));
     }
-}
-
-LoginWidget::~LoginWidget()
-{
-    delete ui;
+    setPalette(palette);
+    setAutoFillBackground(true);
 }
 
 bool LoginWidget::loadUsers()
@@ -108,7 +111,6 @@ bool LoginWidget::loadUsers()
     QFile file("users.json");
     if (file.open(QIODevice::ReadOnly)) {
         users = QJsonDocument::fromJson(file.readAll()).object();
-        file.close();
         return true;
     }
     return false;
@@ -119,7 +121,6 @@ bool LoginWidget::saveUsers()
     QFile file("users.json");
     if (file.open(QIODevice::WriteOnly)) {
         file.write(QJsonDocument(users).toJson());
-        file.close();
         return true;
     }
     return false;
@@ -127,7 +128,7 @@ bool LoginWidget::saveUsers()
 
 bool LoginWidget::checkUser(const QString &username, const QString &password)
 {
-    return users.contains(username) && users[username].toString() == password;
+    return users.contains(username) && users.value(username).toString() == password;
 }
 
 bool LoginWidget::registerUser(const QString &username, const QString &password)
@@ -137,6 +138,42 @@ bool LoginWidget::registerUser(const QString &username, const QString &password)
     }
     users[username] = password;
     return saveUsers();
+}
+
+void LoginWidget::showDisclaimerDialog()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(QStringLiteral("免责声明"));
+    dialog.setModal(true);
+
+    QVBoxLayout *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(18, 18, 18, 18);
+    layout->setSpacing(12);
+
+    QLabel *imageLabel = new QLabel(&dialog);
+    imageLabel->setAlignment(Qt::AlignCenter);
+    const QString imagePath = ResourcePaths::findPhoto("dontganmao.png");
+    QPixmap pixmap(imagePath);
+    if (!pixmap.isNull()) {
+        imageLabel->setPixmap(pixmap.scaled(320, 240, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+
+    QLabel *textLabel = new QLabel(QStringLiteral("本程序仅供娱乐，不作为医学参考价值。"), &dialog);
+    textLabel->setAlignment(Qt::AlignCenter);
+    textLabel->setWordWrap(true);
+
+    QLabel *footerLabel = new QLabel(QStringLiteral("另外，别感冒"), &dialog);
+    footerLabel->setAlignment(Qt::AlignCenter);
+
+    QPushButton *okBtn = new QPushButton(QStringLiteral("确定"), &dialog);
+    okBtn->setFixedWidth(120);
+    connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+
+    layout->addWidget(imageLabel);
+    layout->addWidget(textLabel);
+    layout->addWidget(footerLabel);
+    layout->addWidget(okBtn, 0, Qt::AlignHCenter);
+    dialog.exec();
 }
 
 void LoginWidget::on_loginBtn_clicked()
@@ -151,7 +188,7 @@ void LoginWidget::on_loginBtn_clicked()
 
     if (checkUser(username, password)) {
         QMessageBox::information(nullptr, QStringLiteral("成功"), QStringLiteral("登录成功。"));
-        QMessageBox::information(nullptr, QStringLiteral("免责声明"), QStringLiteral("本程序仅供娱乐，不作为医学参考价值。"));
+        showDisclaimerDialog();
         emit loginSuccess(username);
     } else {
         QMessageBox::warning(nullptr, QStringLiteral("失败"), QStringLiteral("用户名或密码错误。"));

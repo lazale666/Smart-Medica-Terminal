@@ -54,6 +54,7 @@ private:
     void loadRecord(const QString &fileName);
     void loadRecordData(const QString &fileName, QString &diseaseName, QString &diagnosisDate, QString &treatment);
 
+    QString sanitizeUserName(const QString &username) const;
     QString getRecordDir() const;
 
 private:

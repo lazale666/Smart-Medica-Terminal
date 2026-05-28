@@ -4,14 +4,38 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <QSettings>
 
 SettingsWidget_Doc::SettingsWidget_Doc(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::SettingsWidget_Doc)
+    , m_settings(new QSettings("SmartMedica", "DoctorClient", this))
 {
     ui->setupUi(this);
     setMinimumSize(620, 520);
+    setWindowTitle(QStringLiteral("设置"));
+
+    ui->navUserInfoBtn->setText(QStringLiteral("用户信息"));
+    ui->navCacheBtn->setText(QStringLiteral("缓存管理"));
+    ui->navServerBtn->setText(QStringLiteral("服务器配置"));
+    ui->userIconLabel->setText(QStringLiteral("医师"));
+    ui->usernameLabel->setText(QStringLiteral("用户名"));
+    ui->genderLabel->setText(QStringLiteral("性别："));
+    ui->ageLabel->setText(QStringLiteral("年龄："));
+    ui->genderCombo->setItemText(0, QStringLiteral("男"));
+    ui->genderCombo->setItemText(1, QStringLiteral("女"));
+    ui->genderCombo->setItemText(2, QStringLiteral("保密"));
+    ui->saveUserInfoBtn->setText(QStringLiteral("保存信息"));
+    ui->logoutBtn->setText(QStringLiteral("退出登录"));
+    ui->cacheLabel->setText(QStringLiteral("缓存管理"));
+    ui->cacheDescLabel->setText(QStringLiteral("清除医患聊天记录缓存"));
+    ui->clearChatHistoryBtn->setText(QStringLiteral("清除聊天记录"));
+    ui->serverLabel->setText(QStringLiteral("服务器配置"));
+    ui->ipLabel->setText(QStringLiteral("服务器 IP："));
+    ui->portLabel->setText(QStringLiteral("端口号："));
+    ui->saveServerBtn->setText(QStringLiteral("保存配置"));
+
     setStyleSheet(R"(
         QWidget#SettingsWidget_Doc {
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
@@ -37,6 +61,13 @@ SettingsWidget_Doc::SettingsWidget_Doc(QWidget *parent)
             border-radius: 14px;
             padding: 8px 12px;
         }
+        QComboBox QAbstractItemView {
+            background: #081523;
+            color: #EAFBFF;
+            selection-background-color: #C7F4FF;
+            selection-color: #03111D;
+            outline: none;
+        }
         QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
             border: 2px solid #00E5FF;
         }
@@ -45,12 +76,7 @@ SettingsWidget_Doc::SettingsWidget_Doc(QWidget *parent)
             color: #FFFFFF;
             border: 1px solid rgba(255, 160, 176, 0.85);
         }
-        QPushButton#clearChatHistoryBtn:hover {
-            background: rgba(255, 95, 126, 1.0);
-        }
     )");
-
-    m_settings = new QSettings("SmartMedica", "DoctorClient", this);
 
     connect(ui->navUserInfoBtn, &QPushButton::clicked, this, &SettingsWidget_Doc::onNavUserInfoClicked);
     connect(ui->navCacheBtn, &QPushButton::clicked, this, &SettingsWidget_Doc::onNavCacheClicked);
@@ -74,6 +100,7 @@ void SettingsWidget_Doc::setUsername(const QString &username)
 {
     m_currentUsername = username;
     ui->usernameLabel->setText(username);
+    loadSettings();
 }
 
 void SettingsWidget_Doc::setServerConfig(const QString &ip, quint16 port)
@@ -90,14 +117,23 @@ void SettingsWidget_Doc::switchToPage(int pageIndex)
     ui->navServerBtn->setChecked(pageIndex == 2);
 }
 
+QString SettingsWidget_Doc::scopedKey(const QString &field) const
+{
+    QString safeName = m_currentUsername.trimmed();
+    if (safeName.isEmpty()) {
+        safeName = QStringLiteral("anonymous");
+    }
+    safeName.replace(QRegularExpression(QStringLiteral(R"([\\/:*?"<>|\s]+)")), QStringLiteral("_"));
+    return QStringLiteral("doctor/%1/%2").arg(safeName, field);
+}
+
 void SettingsWidget_Doc::loadSettings()
 {
-    const QString ip = m_settings->value("serverIP", "127.0.0.1").toString();
-    const quint16 port = m_settings->value("serverPort", 9999).toUInt();
-    const QString gender = m_settings->value("gender", "保密").toString();
-    const int age = m_settings->value("age", 0).toInt();
+    setServerConfig(m_settings->value("serverIP", "127.0.0.1").toString(),
+                    m_settings->value("serverPort", 9999).toUInt());
 
-    setServerConfig(ip, port);
+    const QString gender = m_settings->value(scopedKey(QStringLiteral("gender")), QStringLiteral("保密")).toString();
+    const int age = m_settings->value(scopedKey(QStringLiteral("age")), 0).toInt();
 
     int genderIndex = 2;
     if (gender == QStringLiteral("男")) {
@@ -105,6 +141,7 @@ void SettingsWidget_Doc::loadSettings()
     } else if (gender == QStringLiteral("女")) {
         genderIndex = 1;
     }
+
     ui->genderCombo->setCurrentIndex(genderIndex);
     ui->ageSpinBox->setValue(age);
 }
@@ -118,8 +155,8 @@ void SettingsWidget_Doc::saveSettings()
 
 void SettingsWidget_Doc::onSaveUserInfoBtnClicked()
 {
-    m_settings->setValue("gender", ui->genderCombo->currentText());
-    m_settings->setValue("age", ui->ageSpinBox->value());
+    m_settings->setValue(scopedKey(QStringLiteral("gender")), ui->genderCombo->currentText());
+    m_settings->setValue(scopedKey(QStringLiteral("age")), ui->ageSpinBox->value());
     m_settings->sync();
     QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("用户信息已保存。"));
 }
@@ -143,7 +180,7 @@ void SettingsWidget_Doc::onSaveServerBtnClicked()
 {
     saveSettings();
     emit serverConfigChanged(ui->ipEdit->text(), ui->portEdit->text().toUInt());
-    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
+    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
 }
 
 void SettingsWidget_Doc::onLogoutBtnClicked()
@@ -157,7 +194,7 @@ void SettingsWidget_Doc::onLogoutBtnClicked()
 
 void SettingsWidget_Doc::onClearChatHistoryClicked()
 {
-    if (QMessageBox::question(nullptr, QStringLiteral("确认清除"), QStringLiteral("确定要清除所有聊天记录吗？"),
+    if (QMessageBox::question(this, QStringLiteral("确认清除"), QStringLiteral("确定要清除所有聊天记录吗？"),
                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
         clearChatHistory();
     }
@@ -165,8 +202,12 @@ void SettingsWidget_Doc::onClearChatHistoryClicked()
 
 void SettingsWidget_Doc::clearChatHistory()
 {
-    const QString appDir = QCoreApplication::applicationDirPath();
-    const QString historyDir = appDir + "/chat_history_doctor";
+    QString safeName = m_currentUsername.trimmed();
+    if (safeName.isEmpty()) {
+        safeName = QStringLiteral("anonymous");
+    }
+    safeName.replace(QRegularExpression(QStringLiteral(R"([\\/:*?"<>|\s]+)")), QStringLiteral("_"));
+    const QString historyDir = QCoreApplication::applicationDirPath() + "/chat_history_doctor/" + safeName;
     QDir dir(historyDir);
     if (dir.exists()) {
         int deletedCount = 0;
@@ -176,8 +217,8 @@ void SettingsWidget_Doc::clearChatHistory()
                 ++deletedCount;
             }
         }
-        QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("已清除 %1 条聊天记录。").arg(deletedCount));
+        QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("已清除 %1 条聊天记录。").arg(deletedCount));
     } else {
-        QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("暂无聊天记录。"));
+        QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("暂无聊天记录。"));
     }
 }

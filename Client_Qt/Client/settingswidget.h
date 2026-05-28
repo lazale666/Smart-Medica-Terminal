@@ -41,6 +41,7 @@ private slots:
     void onNavModeClicked();
     void onNavCacheClicked();
     void onNavServerClicked();
+    void onNavAboutClicked();
     void onCloseBtnClicked();
     void onSelectAllChatClicked();
     void onDeleteChatClicked();
@@ -62,11 +63,18 @@ private:
     void switchToPage(int pageIndex);
     void loadSettings();
     void saveSettings();
+    QString historyRootDir() const;
+    QString currentUserHistoryDir() const;
+    QString sanitizeHistoryUserName(const QString &username) const;
+    QString userScopedKey(const QString &field) const;
+    QString currentUserRecordDir() const;
     void loadChatRecords();
     void loadMedicalRecords();
     void updateTheme();
-    void deleteSelectedChatRecords();
-    void deleteSelectedMedicalRecords();
+    void configureStaticTexts();
+    void rebuildModePageLayout();
+    void setupAboutPage();
+    void updateNavChecks(int pageIndex);
 };
 
 #endif // SETTINGSWIDGET_H

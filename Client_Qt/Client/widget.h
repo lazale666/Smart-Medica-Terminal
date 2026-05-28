@@ -3,22 +3,20 @@
 
 #include <QWidget>
 #include <QTcpSocket>
-#include <QMessageBox>
-#include <QJsonObject>
-#include <QJsonDocument>
-#include <QJsonParseError>
 #include <QTimer>
-#include <QMouseEvent>
+#include <QMessageBox>
 #include <QFile>
-#include <QCoreApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QListWidgetItem>
+#include <QSettings>
 #include "dialog.h"
 #include "audio.h"
 #include "speech.h"
+#include "settingswidget.h"
 
 QT_BEGIN_NAMESPACE
-namespace Ui {
-class Widget;
-}
+namespace Ui { class Widget; }
 QT_END_NAMESPACE
 
 class Widget : public QWidget
@@ -29,41 +27,72 @@ public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
 
-signals:
-    void sendInfo(int);
+    void setUsername(const QString &username);
+    void setServerInfo(const QString &ip, int port, bool autoConnect);
+    void applyModeSettings(const QString &mode);
+    void applyFontColor(const QString &color);
+    void applyBgColor(const QString &color);
+    void connectToServer();
 
 private slots:
-    void on_pushButton_2_clicked();
     void connectService();
     void disConnectService();
-    void connectError(QAbstractSocket::SocketError);
-    void readData();
+    void connectError(QAbstractSocket::SocketError err);
     void reconnect();
+    void readData();
+    void onHistoryLoadTimerTick();
     void on_pushButton_clicked();
     void on_voiceBtn_pressed();
     void on_voiceBtn_released();
-    void onHistoryLoadTimerTick();
+    void onHistoryItemClicked(QListWidgetItem *item);
+    void onLogout();
+    void onModeChanged(const QString &mode);
+    void onFontColorChanged(const QString &color);
+    void onBgColorChanged(const QString &color);
+    void onCacheCleared();
+    void onReadBtnClicked();
+    void onSettingsBtnClicked();
+    void onCloseSettings();
+    void onServerConfigChanged(const QString &ip, quint16 port, bool autoConnect);
+    void onLogoutFromSettings();
+
+signals:
+    void backToMenu();
+    void sendInfo(int count);
+
+private:
+    void loadSettings();
+    void saveSettings();
+    void createNewChat();
+    void saveChatMessage(const QString &role, const QString &content);
+    void loadChatHistory(const QString &fileName);
+    void refreshHistoryList();
+    QString getHistoryDir() const;
 
 private:
     Ui::Widget *ui;
+    SettingsWidget *settingsWidget;
     QTcpSocket *socket;
-    QByteArray buffer;
-    int conFlag,errFlag;
     QTimer *timer;
     QTimer *historyTimer;
-    int count;
     QMessageBox *msg;
     Dialog *dia;
     Audio *audio;
     Speech *speech;
-    bool isRecording;
-    QString m_chatHistoryFile;
-    bool m_isThinking;
-    bool m_isInterrupted;
-    QString m_pendingUserMessage;
-
-    void saveChatMessage(const QString &role, const QString &content);
-    void loadChatHistory();
+    QByteArray buffer;
+    QString m_currentChatFile;
+    QString m_username;
+    QString m_serverIP;
+    int m_serverPort;
+    bool m_autoConnect;
+    QString m_currentMode;
+    QString m_fontColor;
+    QString m_bgColor;
+    QSettings *m_settings;
+    int conFlag, errFlag, count;
+    bool isRecording, m_isThinking, m_isInterrupted;
+    bool m_isNewSession;
+    QString m_firstMessage;
 };
 
 #endif // WIDGET_H

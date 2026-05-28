@@ -13,7 +13,8 @@ class Http:public QObject
     Q_OBJECT
 public:
     explicit Http();
-    bool postSyn(QString url,QMap<QString,QString>headerdata,QByteArray requestData,QByteArray &replayData);
+    bool postSyn(QString url, QMap<QString, QString> headerdata, QByteArray requestData, QByteArray &replayData);
+    bool getSyn(QString url, QByteArray &replayData);
 };
 
 #endif // HTTP_H

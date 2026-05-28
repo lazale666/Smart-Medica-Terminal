@@ -46,6 +46,7 @@ private slots:
     void onSelectAllMedicalClicked();
     void onDeleteMedicalClicked();
     void onBgColorBtnClicked();
+    void onSaveServerBtnClicked();
 
 private:
     Ui::SettingsWidget *ui;

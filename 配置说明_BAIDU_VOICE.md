@@ -1,142 +1,141 @@
-# 百度语音 API 配置指南
+# 百度语音配置说明
 
-## 1. 获取百度语音 API 凭证
+本文档只说明当前仓库里“百度语音相关代码”的真实用法。
 
-### 步骤 1：注册百度智能云账号
+## 1. 当前项目中百度语音的作用
 
-1. 访问百度智能云官网：https://cloud.baidu.com/
-2. 注册并登录账号
+普通用户客户端里，百度语音目前用于：
 
-### 步骤 2：开通语音技术服务
+- 录音文件转文字
 
-1. 登录后，进入"产品服务" -> "人工智能" -> "语音技术"
-2. 点击"立即使用"或"开通服务"
-3. 完成实名认证（如果需要）
+对应代码：
 
-### 步骤 3：创建应用获取凭证
+- `Client_Qt/Client/audio.cpp`
+- `Client_Qt/Client/speech.cpp`
+- `Client_Qt/Client/speech.h`
 
-1. 进入"控制台" -> "语音技术"
-2. 点击"创建应用"
-3. 填写应用信息（应用名称、应用描述等）
-4. 在"API Key"和"Secret Key"处获取你的凭证
-5. **重要**：确保开通了以下服务：
-   - ✅ 语音识别（ASR）
-   - ✅ 语音合成（TTS）- 可选
+需要特别注意：
 
-## 2. 配置凭证到代码
+1. “朗读 AI 回复”不是走百度语音。
+   当前朗读使用的是 Qt 自带的 `QTextToSpeech`。
 
-找到 `speech.h` 文件，修改以下内容：
+2. 百度 TTS 的代码虽然存在于 `Speech` 类里，但普通聊天界面当前没有直接调用这条路径。
+
+## 2. 当前配置位置
+
+百度语音相关常量写在：
+
+```text
+Client_Qt/Client/speech.h
+```
+
+当前可见内容包括：
+
+- `client_id`
+- `client_secret`
+- `baiduTokenUrl`
+- `baiduSpeechUrl`
+- `baiduTtsUrl`
+
+另外，调用时还写死了一个 `cuid`，位置在：
+
+```text
+Client_Qt/Client/speech.cpp
+```
+
+## 3. 推荐做法
+
+如果你要继续使用百度语音，请至少替换以下内容：
+
+1. `client_id`
+2. `client_secret`
+3. `speech.cpp` 里构造请求时使用的 `cuid`
+
+建议把它们改成你自己的配置，不要继续使用仓库里已有值。
+
+## 4. 修改步骤
+
+### 步骤 1：申请百度智能云语音服务
+
+需要准备：
+
+- 百度智能云账号
+- 语音识别应用
+- 对应的 API Key / Secret Key
+
+### 步骤 2：修改 `speech.h`
+
+把以下常量替换成你自己的值：
 
 ```cpp
-// 文件路径：Client_Qt/Client/speech.h
-
-// 修改前（第14-16行）：
-const QString client_id = "";
-const QString client_secret = "";
-
-// 修改后：
-const QString client_id = "你的API_KEY";      // 例如：aBcDeFgHiJkLmNoPqRsTuVwXyZ
-const QString client_secret = "你的SECRET_KEY";  // 例如：AbCdEfGhIjKlMnOpQrStUvWxYz0123456789
+const QString client_id = "...";
+const QString client_secret = "...";
 ```
 
-### 完整示例
+### 步骤 3：修改 `speech.cpp`
+
+将请求里使用的 `cuid` 替换成你自己的稳定标识，例如：
 
 ```cpp
-const QString baiduTokenUrl = "http://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=%1&client_secret=%2&";
-const QString client_id = "LKF8XXXXXXXXXXXXX";  // 替换为你的 API Key
-const QString client_secret = "hXXXXXXXXXXXXXXXXXXXXXXXXX";  // 替换为你的 Secret Key
-const QString baiduSpeechurl = "http://vop.baidu.com/server_api?dev_pid=1537&cuid=%1&token=%2";
+QString baiduSpeech = QString(baiduSpeechUrl).arg("SmartMedicaClient").arg(token);
 ```
 
-## 3. 验证配置
+如果你后续也要启用百度 TTS，同样需要替换 `textToSpeech()` 里的 `cuid`。
 
-### 测试语音识别
+## 5. 运行前提
 
-1. 重新编译项目
-2. 运行客户端
-3. 连接服务器
-4. 按住麦克风按钮说话
-5. 松开按钮，等待识别结果
+百度语音识别要正常工作，需要同时满足：
 
-### 预期输出
+- 录音设备可用
+- Qt Multimedia 模块已安装
+- 客户端能访问公网
+- 百度接口凭证有效
+- 录音文件格式满足接口要求
 
-```
-开始录音...
-录音结束，正在识别...
-识别结果：你好
-我：你好
-茯苓：你好！有什么可以帮助你的吗？
+当前代码发送的请求头是：
+
+```text
+Content-Type: audio/pcm;rate=16000
 ```
 
-## 4. 常见问题
+因此如果你修改了录音参数，需要同步检查百度接口参数是否仍然匹配。
 
-### 问题 1：识别失败
+## 6. 当前实现限制
 
-**可能原因**：
-- API Key 或 Secret Key 配置错误
-- 网络连接问题
-- 音频文件格式不支持
-- API 服务未开通
+1. 密钥硬编码在源码中，不安全。
+2. 使用 `http` 而不是更稳妥的密钥外置方案。
+3. 失败处理较简单，主要通过弹窗提示。
+4. 没有做请求重试、超时兜底和额度监控。
 
-**解决方案**：
-1. 检查 `speech.h` 中的凭证是否正确
-2. 确保网络可以访问百度 API
-3. 检查 `audio.cpp` 中的音频格式是否为 PCM 16000Hz
-4. 登录百度智能云控制台，确认语音识别服务已开通
+## 7. 更合理的改造建议
 
-### 问题 2：API 调用频率限制
+建议按下面顺序重构：
 
-**说明**：
-百度语音 API 有每日调用次数限制（免费额度）
+1. 把百度密钥迁移到本地配置文件或环境变量。
+2. 为 `Speech` 增加明确的配置加载逻辑。
+3. 将 `cuid` 改成可配置值。
+4. 为语音识别失败增加更清晰的错误日志。
+5. 如果最终只保留 Qt 朗读，可以把百度 TTS 相关代码移除，避免双通道维护。
 
-**解决方案**：
-- 升级到付费套餐
-- 合理控制调用频率
+## 8. 常见问题
 
-### 问题 3：录音文件不存在
+### 录音后没有识别结果
 
-**可能原因**：
-- 录音未成功启动
-- 录音时长太短
-- 文件保存路径错误
+优先检查：
 
-**解决方案**：
-1. 检查是否有麦克风权限
-2. 确保录音时长超过 1 秒
-3. 检查音频文件是否生成在正确路径
+- 百度密钥是否有效
+- 网络是否可访问百度接口
+- 录音文件是否成功生成 `record.wav`
+- 录音格式是否与接口头一致
 
-## 5. 音频格式要求
+### 可以录音，但朗读按钮无声音
 
-百度语音识别 API 对音频格式的要求：
+这通常不是百度问题，而是 `QTextToSpeech` 环境问题。请检查：
 
-| 参数 | 要求 |
-|------|------|
-| 采样率 | 16000 Hz |
-| 声道 | 单声道 |
-| 位深 | 16bit |
-| 编码 | PCM |
-| 格式 | wav 或 pcm |
+- Qt `TextToSpeech` 模块是否安装
+- Windows 语音引擎是否可用
+- 设置页中的朗读音量是否过低
 
-你的 `audio.cpp` 中已经配置了正确的格式：
+### 医生端为什么没有同样的百度配置
 
-```cpp
-QAudioFormat format;
-format.setSampleRate(16000);    // ✅ 采样率
-format.setChannelCount(1);      // ✅ 单声道
-format.setSampleFormat(QAudioFormat::Int16);  // ✅ 16bit
-```
-
-## 6. 获取帮助
-
-如果遇到其他问题，可以：
-
-1. 查看 Qt Creator 的"应用程序输出"面板的错误信息
-2. 检查服务器端的日志输出
-3. 参考百度语音技术文档：https://cloud.baidu.com/doc/SPEECH/index.html
-
-## 7. 安全提示
-
-⚠️ **重要**：
-- 不要将 API Key 和 Secret Key 提交到公开的代码仓库
-- 建议使用环境变量或配置文件来管理敏感信息
-- 定期更换密钥
+因为当前医生端没有把百度语音识别接入到核心流程里。仓库中的主要语音入口仍然在普通用户端。

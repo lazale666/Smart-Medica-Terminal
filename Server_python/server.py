@@ -154,6 +154,8 @@ def get_online_doctors():
     with clients_lock:
         logger.info(f"[DEBUG] get_online_doctors called, doctors count: {len(doctors)}")
         for doctor in doctors:
+            if doctor.get('socket') is None:
+                continue
             online_doctors.append({
                 'id': id(doctor['socket']),
                 'name': doctor.get('name', 'Unknown'),
@@ -276,7 +278,7 @@ def handle_client(client_socket, addr):
                             with clients_lock:
                                 for doctor in doctors:
                                     logger.info(f"[DEBUG] Checking doctor: id={id(doctor['socket'])}, target={doctor_id}")
-                                    if id(doctor['socket']) == doctor_id:
+                                    if id(doctor['socket']) == int(doctor_id):
                                         target_doctor = doctor
                                         break
                             
@@ -285,7 +287,11 @@ def handle_client(client_socket, addr):
                                 client_info['current_doctor'] = target_doctor
                                 target_doctor['current_client'] = client_info
                                 
-                                send_response(client_socket, {'type': 'connection_success', 'message': 'Connected to doctor'})
+                                send_response(client_socket, {
+                                    'type': 'connection_success',
+                                    'message': 'Connected to doctor',
+                                    'doctor_name': target_doctor.get('name', 'Unknown')
+                                })
                                 send_response(target_doctor['socket'], {
                                     'type': 'new_client',
                                     'client_name': client_info.get('name', 'Unknown')

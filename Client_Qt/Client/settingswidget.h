@@ -46,7 +46,7 @@ private slots:
     void onDeleteChatClicked();
     void onSelectAllMedicalClicked();
     void onDeleteMedicalClicked();
-    void onBgColorBtnClicked();
+    void onBgStyleChanged(int index);
     void onSaveServerBtnClicked();
     void onSaveUserInfoBtnClicked();
     void onVolumeSliderChanged(int value);

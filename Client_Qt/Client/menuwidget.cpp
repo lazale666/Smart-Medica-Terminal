@@ -14,7 +14,8 @@ MenuWidget::MenuWidget(QWidget *parent) :
     m_serverPort(9999),
     m_autoConnect(true),
     m_fontColor("#D8F7FF"),
-    m_bgColor("#07111F")
+    m_bgColor("#07111F"),
+    m_currentMode("普通模式")
 {
     ui->setupUi(this);
 
@@ -65,15 +66,79 @@ void MenuWidget::disconnectFromServer()
     }
 }
 
+void MenuWidget::applyModeSettings(const QString &mode)
+{
+    m_currentMode = mode;
+
+    QFont titleFont = ui->titleLabel->font();
+    QFont infoFont = ui->userLabel->font();
+    QFont statusFont = ui->statusLabel->font();
+    QFont buttonFont = ui->chatBtn->font();
+    QFont smallButtonFont = ui->settingsBtn->font();
+
+    if (mode == "关怀模式") {
+        titleFont.setPointSize(34);
+        infoFont.setPointSize(16);
+        statusFont.setPointSize(15);
+        buttonFont.setPointSize(24);
+        smallButtonFont.setPointSize(15);
+
+        ui->titleLabel->setFont(titleFont);
+        ui->userLabel->setFont(infoFont);
+        ui->statusLabel->setFont(statusFont);
+        ui->chatBtn->setFont(buttonFont);
+        ui->medicalRecordBtn->setFont(buttonFont);
+        ui->doctorChatBtn->setFont(buttonFont);
+        ui->memberRechargeBtn->setFont(buttonFont);
+        ui->settingsBtn->setFont(smallButtonFont);
+        ui->logoutBtn->setFont(smallButtonFont);
+
+        ui->chatBtn->setMinimumHeight(132);
+        ui->medicalRecordBtn->setMinimumHeight(132);
+        ui->doctorChatBtn->setMinimumHeight(132);
+        ui->memberRechargeBtn->setMinimumHeight(132);
+        ui->settingsBtn->setMinimumHeight(48);
+        ui->logoutBtn->setMinimumHeight(48);
+        resize(980, 760);
+    } else {
+        titleFont.setPointSize(28);
+        infoFont.setPointSize(14);
+        statusFont.setPointSize(12);
+        buttonFont.setPointSize(20);
+        smallButtonFont.setPointSize(12);
+
+        ui->titleLabel->setFont(titleFont);
+        ui->userLabel->setFont(infoFont);
+        ui->statusLabel->setFont(statusFont);
+        ui->chatBtn->setFont(buttonFont);
+        ui->medicalRecordBtn->setFont(buttonFont);
+        ui->doctorChatBtn->setFont(buttonFont);
+        ui->memberRechargeBtn->setFont(buttonFont);
+        ui->settingsBtn->setFont(smallButtonFont);
+        ui->logoutBtn->setFont(smallButtonFont);
+
+        ui->chatBtn->setMinimumHeight(100);
+        ui->medicalRecordBtn->setMinimumHeight(100);
+        ui->doctorChatBtn->setMinimumHeight(100);
+        ui->memberRechargeBtn->setMinimumHeight(100);
+        ui->settingsBtn->setMinimumHeight(35);
+        ui->logoutBtn->setMinimumHeight(35);
+        resize(800, 600);
+    }
+}
+
 void MenuWidget::applyFontColor(const QString &color)
 {
-    m_fontColor = (color.compare("#000000", Qt::CaseInsensitive) == 0) ? "#D8F7FF" : color;
+    m_fontColor = color;
     ui->userLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
+    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) != 0) {
+        ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(m_fontColor));
+    }
 }
 
 void MenuWidget::applyBgColor(const QString &color)
 {
-    m_bgColor = (color.compare("#ffffff", Qt::CaseInsensitive) == 0) ? "#07111F" : color;
+    m_bgColor = color;
     if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
         setStyleSheet(R"(
             QWidget#MenuWidget {
@@ -100,7 +165,29 @@ void MenuWidget::applyBgColor(const QString &color)
             }
         )");
     } else {
-        setStyleSheet(QString("QWidget#MenuWidget { background-color: %1; }").arg(m_bgColor));
+        setStyleSheet(R"(
+            QWidget#MenuWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F5FBFF, stop:0.55 #E9F6FF, stop:1 #DCEEFF);
+            }
+            QLabel#titleLabel {
+                color: #0F2740;
+                font: 700 30px "Microsoft YaHei";
+            }
+            QLabel#statusLabel, QLabel#userLabel {
+                color: #0F2740;
+            }
+            QPushButton#chatBtn, QPushButton#medicalRecordBtn, QPushButton#doctorChatBtn, QPushButton#memberRechargeBtn {
+                background: rgba(255, 255, 255, 0.9);
+                border: 1px solid rgba(15, 39, 64, 0.18);
+                border-radius: 22px;
+                color: #0F2740;
+                font: 700 20px "Microsoft YaHei";
+                min-height: 94px;
+            }
+            QPushButton#chatBtn:hover, QPushButton#medicalRecordBtn:hover, QPushButton#doctorChatBtn:hover, QPushButton#memberRechargeBtn:hover {
+                background: rgba(199, 244, 255, 0.95);
+            }
+        )");
     }
 }
 
@@ -118,6 +205,7 @@ void MenuWidget::onSettingsBtnClicked()
 {
     SettingsWidget *settings = new SettingsWidget();
     settings->setAttribute(Qt::WA_DeleteOnClose);
+    settings->setCurrentMode(m_currentMode);
     settings->setFontColor(m_fontColor);
     settings->setBgColor(m_bgColor);
     
@@ -139,6 +227,11 @@ void MenuWidget::onSettingsBtnClicked()
     
     QObject::connect(settings, &SettingsWidget::bgColorChanged, [=](const QString &color) {
         applyBgColor(color);
+    });
+
+    QObject::connect(settings, &SettingsWidget::modeChanged, [=](const QString &mode) {
+        applyModeSettings(mode);
+        emit this->modeChanged(mode);
     });
     
     settings->show();
@@ -176,8 +269,10 @@ void MenuWidget::loadSettings()
     m_autoConnect = m_settings->value("autoConnect", true).toBool();
     m_fontColor = m_settings->value("fontColor", "#D8F7FF").toString();
     m_bgColor = m_settings->value("bgColor", "#07111F").toString();
+    m_currentMode = m_settings->value("mode", "普通模式").toString();
     applyFontColor(m_fontColor);
     applyBgColor(m_bgColor);
+    applyModeSettings(m_currentMode);
 }
 
 void MenuWidget::saveSettings()

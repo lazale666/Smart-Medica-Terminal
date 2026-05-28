@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QSettings>
+#include <QResizeEvent>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MemberRechargeWidget; }
@@ -17,6 +18,10 @@ public:
     ~MemberRechargeWidget();
 
     void setUsername(const QString &username);
+    void applyModeSettings(const QString &mode);
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 
 signals:
     void backToMenu();
@@ -30,9 +35,13 @@ private:
     QSettings *m_settings;
     QString m_username;
     bool m_isMember;
+    QString m_bgPath;
+    QSize m_lockedSize;
+    QString m_currentMode;
 
     void loadMemberStatus();
     void saveMemberStatus();
+    void updateBackground();
 };
 
 #endif // MEMBERRECHARGEWIDGET_H

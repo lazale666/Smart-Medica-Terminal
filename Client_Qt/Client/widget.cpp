@@ -7,10 +7,12 @@
 #include <QStringConverter>
 #include <QSettings>
 #include <QFont>
+#include <QtEndian>
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget)
+    , settingsWidget(nullptr)
 {
     ui->setupUi(this);
     socket = new QTcpSocket(this);
@@ -59,8 +61,8 @@ Widget::Widget(QWidget *parent)
 
     loadSettings();
 
-    ui->textBrowser->append("✅ 已进入聊天界面");
-    ui->textBrowser->append("提示：可在设置中配置服务器并手动连接");
+    appendSystemMessage("已进入聊天界面");
+    appendSystemMessage("可在设置中配置服务器并手动连接");
 
     createNewChat();
     refreshHistoryList();
@@ -111,10 +113,10 @@ void Widget::applyModeSettings(const QString &mode)
     QFont lineFont = ui->lineEdit->font();
 
     if (mode == "关怀模式") {
-        font.setPointSize(font.pointSize() * 1.5);
-        labelFont.setPointSize(labelFont.pointSize() * 1.5);
-        btnFont.setPointSize(btnFont.pointSize() * 1.5);
-        lineFont.setPointSize(lineFont.pointSize() * 1.5);
+        font.setPointSize(16);
+        labelFont.setPointSize(15);
+        btnFont.setPointSize(15);
+        lineFont.setPointSize(15);
 
         ui->textBrowser->setFont(font);
         ui->userLabel->setFont(labelFont);
@@ -127,6 +129,18 @@ void Widget::applyModeSettings(const QString &mode)
         ui->chatTitleLabel->setFont(font);
         ui->historyList->setFont(font);
         ui->voiceLabel->setFont(labelFont);
+        ui->backBtn->setFont(btnFont);
+        ui->historyTitle->setFont(labelFont);
+        ui->historyList->setSpacing(10);
+        ui->leftWidget->setMinimumWidth(280);
+        ui->leftWidget->setMaximumWidth(320);
+        ui->lineEdit->setMinimumHeight(52);
+        ui->pushButton->setMinimumHeight(52);
+        ui->voiceBtn->setMinimumHeight(52);
+        ui->readBtn->setMinimumHeight(52);
+        ui->newChatBtn->setMinimumHeight(48);
+        ui->backBtn->setMinimumHeight(48);
+        ui->settingsBtn->setMinimumHeight(48);
     } else {
         font.setPointSize(10);
         labelFont.setPointSize(10);
@@ -144,6 +158,18 @@ void Widget::applyModeSettings(const QString &mode)
         ui->chatTitleLabel->setFont(font);
         ui->historyList->setFont(font);
         ui->voiceLabel->setFont(labelFont);
+        ui->backBtn->setFont(btnFont);
+        ui->historyTitle->setFont(labelFont);
+        ui->historyList->setSpacing(4);
+        ui->leftWidget->setMinimumWidth(220);
+        ui->leftWidget->setMaximumWidth(220);
+        ui->lineEdit->setMinimumHeight(36);
+        ui->pushButton->setMinimumHeight(36);
+        ui->voiceBtn->setMinimumHeight(36);
+        ui->readBtn->setMinimumHeight(36);
+        ui->newChatBtn->setMinimumHeight(40);
+        ui->backBtn->setMinimumHeight(40);
+        ui->settingsBtn->setMinimumHeight(36);
     }
 }
 
@@ -193,7 +219,7 @@ void Widget::connectToServer()
     if (socket->state() == QTcpSocket::ConnectedState) {
         socket->disconnectFromHost();
     }
-    ui->textBrowser->append(QString("🔌 正在连接服务器 %1:%2...").arg(m_serverIP).arg(m_serverPort));
+    appendSystemMessage(QString("正在连接服务器 %1:%2...").arg(m_serverIP).arg(m_serverPort));
     socket->connectToHost(m_serverIP, m_serverPort);
     conFlag = 1;
 }
@@ -218,7 +244,7 @@ void Widget::createNewChat()
     QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
     m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
 
-    ui->textBrowser->append("✅ 已开启新对话");
+    appendSystemMessage("已开启新对话");
     applyFontColor(m_fontColor);
 }
 
@@ -268,8 +294,7 @@ void Widget::onHistoryItemClicked(QListWidgetItem *item)
 
 void Widget::connectService()
 {
-    ui->textBrowser->append("✅ 已连接服务器");
-    connect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
+    appendSystemMessage("已连接服务器");
 
     if (!m_currentChatFile.isEmpty()) {
         QFileInfo fi(m_currentChatFile);
@@ -317,7 +342,7 @@ void Widget::readData()
 
                 m_isThinking = false;
                 ui->pushButton->setText("发送");
-                ui->textBrowser->append("🤖 创伤小组：" + content);
+                appendChatMessage("创伤小组", content, false);
                 saveChatMessage("创伤小组", content);
             }
         }
@@ -326,9 +351,8 @@ void Widget::readData()
 
 void Widget::disConnectService()
 {
-    disconnect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
     conFlag = 0;
-    ui->textBrowser->append("❌ 已断开服务器");
+    appendSystemMessage("已断开服务器");
     m_isThinking = false;
     m_isInterrupted = false;
     ui->pushButton->setText("发送");
@@ -366,7 +390,7 @@ void Widget::on_pushButton_clicked()
     QString message = ui->lineEdit->text().trimmed();
     if (message.isEmpty()) return;
 
-    ui->textBrowser->append("👤 我：" + message);
+    appendChatMessage(m_username.isEmpty() ? "我" : m_username, message, true);
     saveChatMessage("我", message);
 
     if (m_isNewSession && m_firstMessage.isEmpty()) {
@@ -390,7 +414,7 @@ void Widget::on_pushButton_clicked()
     socket->flush();
     ui->lineEdit->clear();
 
-    ui->textBrowser->append("⌛ 思考中...");
+    appendSystemMessage("思考中...");
     ui->pushButton->setText("中断");
     m_isThinking = true;
     m_isInterrupted = false;
@@ -402,7 +426,7 @@ void Widget::on_voiceBtn_pressed()
     ui->voiceBtn->setText("🔴");
     ui->voiceLabel->setText("录制中...松开停止");
     audio->startAudioRecord("record.wav");
-    ui->textBrowser->append("开始录音...");
+    appendSystemMessage("开始录音...");
 }
 
 void Widget::on_voiceBtn_released()
@@ -413,11 +437,11 @@ void Widget::on_voiceBtn_released()
     audio->stopAudioRecord();
     ui->voiceBtn->setText("🎤");
     ui->voiceLabel->setText("按住说话，松开发送");
-    ui->textBrowser->append("识别中...");
+    appendSystemMessage("识别中...");
 
     QString recognizedText = speech->speechIdentify("record.wav");
     if (!recognizedText.isEmpty()) {
-        ui->textBrowser->append("👤 我：" + recognizedText);
+        appendChatMessage(m_username.isEmpty() ? "我" : m_username, recognizedText, true);
         saveChatMessage("我", recognizedText);
 
         if (m_isNewSession && m_firstMessage.isEmpty()) {
@@ -438,12 +462,12 @@ void Widget::on_voiceBtn_released()
         socket->write(packet);
         socket->flush();
 
-        ui->textBrowser->append("⌛ 思考中...");
+        appendSystemMessage("思考中...");
         ui->pushButton->setText("中断");
         m_isThinking = true;
         m_isInterrupted = false;
     } else {
-        ui->textBrowser->append("识别失败");
+        appendSystemMessage("识别失败");
     }
 }
 
@@ -478,7 +502,7 @@ void Widget::loadChatHistory(const QString &fileName)
     QFile file(fullPath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
 
-    ui->textBrowser->append("------------------- 历史对话 -------------------");
+    appendHistorySeparator(true);
     QTextStream in(&file);
     in.setEncoding(QStringConverter::Utf8);
     while (!in.atEnd()) {
@@ -490,12 +514,12 @@ void Widget::loadChatHistory(const QString &fileName)
             content.replace("\\n", "\n");
             content.replace("\\\\", "\\");
             if (role == "我")
-                ui->textBrowser->append("👤 我：" + content);
+                appendChatMessage(m_username.isEmpty() ? "我" : m_username, content, true);
             else
-                ui->textBrowser->append("🤖 创伤小组：" + content);
+                appendChatMessage("创伤小组", content, false);
         }
     }
-    ui->textBrowser->append("--------------------------------------------------");
+    appendHistorySeparator(false);
     file.close();
 }
 
@@ -530,44 +554,16 @@ void Widget::onSettingsBtnClicked()
 
 void Widget::onLogout()
 {
-    timer->stop();
-    historyTimer->stop();
-    m_isThinking = false;
-    m_isInterrupted = false;
-    conFlag = 0;
-
-    disconnect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
-    if (socket->state() == QTcpSocket::ConnectedState ||
-        socket->state() == QTcpSocket::ConnectingState) {
-        socket->disconnectFromHost();
-    }
-
-    if (settingsWidget) {
-        SettingsWidget *widget = settingsWidget;
-        settingsWidget = nullptr;
-        widget->close();
-        widget->deleteLater();
-    }
-    emit backToMenu();
+    leaveChatScene([this]() {
+        emit backToMenu();
+    });
 }
 
 void Widget::onLogoutFromSettings()
 {
-    timer->stop();
-    historyTimer->stop();
-    disconnect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
-    if (socket->state() == QTcpSocket::ConnectedState ||
-        socket->state() == QTcpSocket::ConnectingState) {
-        socket->disconnectFromHost();
-    }
-
-    if (settingsWidget) {
-        SettingsWidget *widget = settingsWidget;
-        settingsWidget = nullptr;
-        widget->close();
-        widget->deleteLater();
-    }
-    emit logout();
+    leaveChatScene([this]() {
+        emit logout();
+    });
 }
 
 void Widget::onCloseSettings()
@@ -584,6 +580,7 @@ void Widget::onModeChanged(const QString &mode)
 {
     applyModeSettings(mode);
     refreshHistoryList();
+    emit modeChanged(mode);
 }
 
 void Widget::onFontColorChanged(const QString &color)
@@ -668,7 +665,7 @@ void Widget::onReadBtnClicked()
 void Widget::onCacheCleared()
 {
     ui->textBrowser->clear();
-    ui->textBrowser->append("✅ 已开启新对话");
+    appendSystemMessage("已开启新对话");
     m_isNewSession = true;
     m_firstMessage.clear();
 
@@ -676,4 +673,85 @@ void Widget::onCacheCleared()
     m_currentChatFile = getHistoryDir() + "/chat_" + timestamp + ".txt";
 
     refreshHistoryList();
+}
+
+void Widget::appendChatMessage(const QString &sender, const QString &message, bool isSelf)
+{
+    const QString safeSender = sender.toHtmlEscaped();
+    const QString safeMessage = message.toHtmlEscaped().replace("\n", "<br>");
+    const QString wrapperStyle = isSelf
+        ? "margin: 12px 0 12px auto; max-width: 72%; text-align: right;"
+        : "margin: 12px auto 12px 0; max-width: 72%; text-align: left;";
+    const QString nameColor = isSelf ? "#8BD9FF" : "#31FFB7";
+    const QString cardStyle = isSelf
+        ? "display:inline-block; background-color: rgba(0,229,255,0.18); border: 1px solid rgba(0,229,255,0.45); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;"
+        : "display:inline-block; background-color: rgba(49,255,183,0.14); border: 1px solid rgba(49,255,183,0.35); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;";
+
+    ui->textBrowser->append(QString(
+        "<div style=\"%1\">"
+        "<div style=\"font-size:12px; font-weight:700; color:%2; margin-bottom:6px;\">%3</div>"
+        "<div style=\"%4\">%5</div>"
+        "</div>")
+        .arg(wrapperStyle, nameColor, safeSender, cardStyle, safeMessage));
+}
+
+void Widget::appendSystemMessage(const QString &message)
+{
+    ui->textBrowser->append(QString(
+        "<div style=\"margin: 10px 0; text-align: center;\">"
+        "<span style=\"display:inline-block; padding: 6px 14px; border-radius: 14px; "
+        "background: rgba(139,185,200,0.14); border: 1px solid rgba(139,185,200,0.28); "
+        "color: #8BB9C8; font-size: 12px;\">%1</span>"
+        "</div>")
+        .arg(message.toHtmlEscaped()));
+}
+
+void Widget::appendHistorySeparator(bool isTop)
+{
+    appendSystemMessage(isTop ? "历史对话" : "历史对话结束");
+}
+
+void Widget::setSocketHandlersActive(bool active)
+{
+    if (active) {
+        connect(socket, &QTcpSocket::readyRead, this, &Widget::readData, Qt::UniqueConnection);
+    } else {
+        disconnect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
+    }
+}
+
+void Widget::leaveChatScene(const std::function<void()> &afterCleanup)
+{
+    timer->stop();
+    historyTimer->stop();
+    m_isThinking = false;
+    m_isInterrupted = false;
+    conFlag = 0;
+    errFlag = 0;
+
+    setSocketHandlersActive(false);
+    disconnect(socket, &QTcpSocket::connected, this, &Widget::connectService);
+    disconnect(socket, &QTcpSocket::disconnected, this, &Widget::disConnectService);
+    disconnect(socket, &QTcpSocket::errorOccurred, this, &Widget::connectError);
+
+    if (socket->state() == QTcpSocket::ConnectedState ||
+        socket->state() == QTcpSocket::ConnectingState) {
+        socket->abort();
+    }
+
+    if (settingsWidget) {
+        SettingsWidget *widget = settingsWidget;
+        settingsWidget = nullptr;
+        widget->close();
+        widget->deleteLater();
+    }
+
+    connect(socket, &QTcpSocket::connected, this, &Widget::connectService, Qt::UniqueConnection);
+    connect(socket, &QTcpSocket::disconnected, this, &Widget::disConnectService, Qt::UniqueConnection);
+    connect(socket, &QTcpSocket::errorOccurred, this, &Widget::connectError, Qt::UniqueConnection);
+    setSocketHandlersActive(true);
+
+    if (afterCleanup) {
+        afterCleanup();
+    }
 }

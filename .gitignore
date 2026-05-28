@@ -15,6 +15,7 @@ Makefile*
 *.lib
 *.dll
 *.exe
+*.pyc
 
 # Qt自动生成的文件
 moc_*.cpp

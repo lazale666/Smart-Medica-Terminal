@@ -213,16 +213,11 @@ void DoctorChatWidget::readData()
                 setWindowTitle("医生咨询中心 - " + name);
             } else if (type == "new_client") {
                 QString clientName = obj.value("client_name").toString();
-                ui->textBrowser->append(QString("<div style=\"padding: 10px;\"><span style=\"color: #31ffb7; font-style: italic; font-size: 13px;\">用户 %1 已连接</span></div>").arg(clientName.toHtmlEscaped()));
+                appendSystemMessage(QString("用户 %1 已连接").arg(clientName));
             } else if (type == "client_message") {
                 QString message = obj.value("message").toString();
                 messageHistory.append(QString("%1：%2").arg(sender, message));
-                
-                QString formattedMsg = QString("<div style=\"background-color: rgba(49,255,183,0.14); color: #eafbff; padding: 12px 20px; border-radius: 16px; margin: 10px 0; max-width: 70%; border: 1px solid rgba(49,255,183,0.35);\">"
-                                              "<span style=\"font-weight: 600; color: #31ffb7; font-size: 13px;\">%1</span><br>"
-                                              "<span style=\"font-size: 15px; line-height: 1.6;\">%2</span>"
-                                              "</div>").arg(sender.toHtmlEscaped(), message.toHtmlEscaped());
-                ui->textBrowser->append(formattedMsg);
+                appendChatMessage(sender, message, false);
             }
         }
     }
@@ -237,12 +232,8 @@ void DoctorChatWidget::on_sendBtn_clicked()
     
     sendMessage(message);
     messageHistory.append(QString("我：%1").arg(message));
-    
-    QString formattedMsg = QString("<div style=\"background-color: rgba(0,229,255,0.24); color: #eafbff; padding: 12px 20px; border-radius: 16px; margin: 10px 0; max-width: 70%; margin-left: auto; text-align: right; border: 1px solid rgba(0,229,255,0.55);\">"
-                                  "<span style=\"font-weight: 600; font-size: 13px;\">我</span><br>"
-                                  "<span style=\"font-size: 15px; line-height: 1.6;\">%1</span>"
-                                  "</div>").arg(message.toHtmlEscaped());
-    ui->textBrowser->append(formattedMsg);
+
+    appendChatMessage(m_username.isEmpty() ? "我" : m_username, message, true);
     ui->lineEdit->clear();
 }
 
@@ -266,4 +257,35 @@ void DoctorChatWidget::on_settingsBtn_clicked()
     settingsWidget->show();
     settingsWidget->raise();
     settingsWidget->activateWindow();
+}
+
+void DoctorChatWidget::appendChatMessage(const QString &sender, const QString &message, bool isSelf)
+{
+    const QString safeSender = sender.toHtmlEscaped();
+    const QString safeMessage = message.toHtmlEscaped().replace("\n", "<br>");
+    const QString wrapperStyle = isSelf
+        ? "margin: 12px 0 12px auto; max-width: 72%; text-align: right;"
+        : "margin: 12px auto 12px 0; max-width: 72%; text-align: left;";
+    const QString nameColor = isSelf ? "#8BD9FF" : "#31FFB7";
+    const QString cardStyle = isSelf
+        ? "display:inline-block; background-color: rgba(0,229,255,0.18); border: 1px solid rgba(0,229,255,0.45); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;"
+        : "display:inline-block; background-color: rgba(49,255,183,0.14); border: 1px solid rgba(49,255,183,0.35); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;";
+
+    ui->textBrowser->append(QString(
+        "<div style=\"%1\">"
+        "<div style=\"font-size:12px; font-weight:700; color:%2; margin-bottom:6px;\">%3</div>"
+        "<div style=\"%4\">%5</div>"
+        "</div>")
+        .arg(wrapperStyle, nameColor, safeSender, cardStyle, safeMessage));
+}
+
+void DoctorChatWidget::appendSystemMessage(const QString &message)
+{
+    ui->textBrowser->append(QString(
+        "<div style=\"margin: 10px 0; text-align: center;\">"
+        "<span style=\"display:inline-block; padding: 6px 14px; border-radius: 14px; "
+        "background: rgba(139,185,200,0.14); border: 1px solid rgba(139,185,200,0.28); "
+        "color: #8BB9C8; font-size: 12px;\">%1</span>"
+        "</div>")
+        .arg(message.toHtmlEscaped()));
 }

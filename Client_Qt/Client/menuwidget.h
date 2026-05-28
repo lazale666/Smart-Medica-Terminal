@@ -21,6 +21,7 @@ public:
     QString getUsername() const;
     void setServerInfo(const QString &ip, int port);
     void disconnectFromServer();
+    void applyModeSettings(const QString &mode);
     void applyFontColor(const QString &color);
     void applyBgColor(const QString &color);
 
@@ -29,6 +30,7 @@ signals:
     void openMedicalRecord(const QString &serverIP, int serverPort, bool autoConnect);
     void openDoctorChat(const QString &serverIP, int serverPort);
     void openMemberRecharge();
+    void modeChanged(const QString &mode);
     void logout();
 
 private slots:
@@ -61,6 +63,7 @@ private:
     QSettings *m_settings;
     QString m_fontColor;
     QString m_bgColor;
+    QString m_currentMode;
 };
 
 #endif // MENUWIDGET_H

@@ -60,6 +60,7 @@ DoctorDialog::DoctorDialog(QTcpSocket *socket, const QString &username, const QS
     connect(m_socket, &QTcpSocket::readyRead, this, &DoctorDialog::readData);
     connect(ui->sendBtn, &QPushButton::clicked, this, &DoctorDialog::onSendBtnClicked);
     connect(ui->closeBtn, &QPushButton::clicked, this, &DoctorDialog::onCloseBtnClicked);
+    appendSystemMessage(QString("已连接医师 %1").arg(m_doctorName));
 }
 
 DoctorDialog::~DoctorDialog()
@@ -110,18 +111,7 @@ void DoctorDialog::readData()
             if (type == "client_message") {
                 QString sender = obj.value("sender").toString();
                 QString message = obj.value("message").toString();
-
-                QString formattedMsg;
-                if (sender == m_username) {
-                    formattedMsg = QString("<div style='background-color: rgba(0,229,255,0.24); color: #eafbff; padding: 10px 16px; border-radius: 16px; margin: 10px 0; max-width: 70%; text-align: right; margin-left: auto; border: 1px solid rgba(0,229,255,0.55);'>\n"
-                                          "<span style='font-weight: 600;'>我：</span>%1\n"
-                                          "</div>").arg(message.toHtmlEscaped());
-                } else {
-                    formattedMsg = QString("<div style='background-color: rgba(49,255,183,0.14); color: #eafbff; padding: 10px 16px; border-radius: 16px; margin: 10px 0; max-width: 70%; border: 1px solid rgba(49,255,183,0.35);'>\n"
-                                          "<span style='font-weight: 600; color: #31ffb7;'>%1：</span>%2\n"
-                                          "</div>").arg(m_doctorName.toHtmlEscaped(), message.toHtmlEscaped());
-                }
-                ui->textBrowser->append(formattedMsg);
+                appendChatMessage(sender == m_username ? m_username : m_doctorName, message, sender == m_username);
             }
         }
     }
@@ -132,10 +122,7 @@ void DoctorDialog::onSendBtnClicked()
     QString message = ui->lineEdit->text().trimmed();
     if (message.isEmpty()) return;
 
-    QString formattedMsg = QString("<div style='background-color: rgba(0,229,255,0.24); color: #eafbff; padding: 10px 16px; border-radius: 16px; margin: 10px 0; max-width: 70%; text-align: right; margin-left: auto; border: 1px solid rgba(0,229,255,0.55);'>\n"
-                                  "<span style='font-weight: 600;'>我：</span>%1\n"
-                                  "</div>").arg(message.toHtmlEscaped());
-    ui->textBrowser->append(formattedMsg);
+    appendChatMessage(m_username, message, true);
 
     sendMessage(message);
     ui->lineEdit->clear();
@@ -144,4 +131,72 @@ void DoctorDialog::onSendBtnClicked()
 void DoctorDialog::onCloseBtnClicked()
 {
     close();
+}
+
+void DoctorDialog::applyModeSettings(const QString &mode)
+{
+    m_currentMode = mode;
+
+    QFont browserFont = ui->textBrowser->font();
+    QFont lineFont = ui->lineEdit->font();
+    QFont buttonFont = ui->sendBtn->font();
+
+    if (mode == "关怀模式") {
+        browserFont.setPointSize(16);
+        lineFont.setPointSize(15);
+        buttonFont.setPointSize(15);
+
+        ui->textBrowser->setFont(browserFont);
+        ui->lineEdit->setFont(lineFont);
+        ui->sendBtn->setFont(buttonFont);
+        ui->closeBtn->setFont(buttonFont);
+        ui->lineEdit->setMinimumHeight(52);
+        ui->sendBtn->setMinimumHeight(52);
+        ui->closeBtn->setMinimumHeight(52);
+        resize(900, 680);
+    } else {
+        browserFont.setPointSize(14);
+        lineFont.setPointSize(14);
+        buttonFont.setPointSize(14);
+
+        ui->textBrowser->setFont(browserFont);
+        ui->lineEdit->setFont(lineFont);
+        ui->sendBtn->setFont(buttonFont);
+        ui->closeBtn->setFont(buttonFont);
+        ui->lineEdit->setMinimumHeight(24);
+        ui->sendBtn->setMinimumHeight(34);
+        ui->closeBtn->setMinimumHeight(34);
+        resize(640, 520);
+    }
+}
+
+void DoctorDialog::appendChatMessage(const QString &sender, const QString &message, bool isSelf)
+{
+    const QString safeSender = sender.toHtmlEscaped();
+    const QString safeMessage = message.toHtmlEscaped().replace("\n", "<br>");
+    const QString wrapperStyle = isSelf
+        ? "margin: 12px 0 12px auto; max-width: 72%; text-align: right;"
+        : "margin: 12px auto 12px 0; max-width: 72%; text-align: left;";
+    const QString nameColor = isSelf ? "#8BD9FF" : "#31FFB7";
+    const QString cardStyle = isSelf
+        ? "display:inline-block; background-color: rgba(0,229,255,0.18); border: 1px solid rgba(0,229,255,0.45); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;"
+        : "display:inline-block; background-color: rgba(49,255,183,0.14); border: 1px solid rgba(49,255,183,0.35); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;";
+
+    ui->textBrowser->append(QString(
+        "<div style=\"%1\">"
+        "<div style=\"font-size:12px; font-weight:700; color:%2; margin-bottom:6px;\">%3</div>"
+        "<div style=\"%4\">%5</div>"
+        "</div>")
+        .arg(wrapperStyle, nameColor, safeSender, cardStyle, safeMessage));
+}
+
+void DoctorDialog::appendSystemMessage(const QString &message)
+{
+    ui->textBrowser->append(QString(
+        "<div style=\"margin: 10px 0; text-align: center;\">"
+        "<span style=\"display:inline-block; padding: 6px 14px; border-radius: 14px; "
+        "background: rgba(139,185,200,0.14); border: 1px solid rgba(139,185,200,0.28); "
+        "color: #8BB9C8; font-size: 12px;\">%1</span>"
+        "</div>")
+        .arg(message.toHtmlEscaped()));
 }

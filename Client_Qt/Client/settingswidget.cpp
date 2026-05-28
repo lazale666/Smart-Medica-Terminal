@@ -30,6 +30,15 @@ SettingsWidget::SettingsWidget(QWidget *parent)
             color: #00E5FF;
             font-weight: 700;
         }
+        QComboBox {
+            color: #EAFBFF;
+        }
+        QComboBox QAbstractItemView {
+            background: #F5FBFF;
+            color: #0F2740;
+            selection-background-color: #C7F4FF;
+            selection-color: #03111D;
+        }
     )");
 
     m_settings = new QSettings("SmartMedica", "Client", this);
@@ -44,7 +53,7 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     connect(ui->logoutBtn, &QPushButton::clicked, this, &SettingsWidget::onLogoutBtnClicked);
     connect(ui->modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsWidget::onModeChanged);
     connect(ui->colorBtn, &QPushButton::clicked, this, &SettingsWidget::onColorBtnClicked);
-    connect(ui->bgColorBtn, &QPushButton::clicked, this, &SettingsWidget::onBgColorBtnClicked);
+    connect(ui->bgStyleCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SettingsWidget::onBgStyleChanged);
     connect(ui->saveServerBtn, &QPushButton::clicked, this, &SettingsWidget::onSaveServerBtnClicked);
     connect(ui->saveUserInfoBtn, &QPushButton::clicked, this, &SettingsWidget::onSaveUserInfoBtnClicked);
 
@@ -85,7 +94,10 @@ void SettingsWidget::setCurrentMode(const QString &mode)
     bool showColor = !(mode == "极简模式" || mode == "关怀模式");
     ui->colorLabel->setVisible(showColor);
     ui->colorBtn->setVisible(showColor);
-    ui->colorPreview->setVisible(showColor);
+    ui->bgColorLabel->setVisible(showColor);
+    ui->bgStyleCombo->setVisible(showColor);
+    ui->bgStyleHintLabel->setVisible(showColor);
+    ui->colorPreview->setVisible(true);
     
     if (mode == "极简模式") {
         ui->modeCombo->setCurrentIndex(1);
@@ -108,10 +120,10 @@ void SettingsWidget::setFontColor(const QString &color)
 void SettingsWidget::setBgColor(const QString &color)
 {
     m_currentBgColor = color;
-    // 更新合并后的大预览
     ui->colorPreview->setStyleSheet(QString("background-color: %1; color: %2;")
                                     .arg(color)
                                     .arg(m_currentColor));
+    ui->bgStyleCombo->setCurrentIndex(color.compare("#07111F", Qt::CaseInsensitive) == 0 ? 0 : 1);
 }
 
 void SettingsWidget::switchToPage(int pageIndex)
@@ -309,10 +321,13 @@ void SettingsWidget::onModeChanged(int index)
         ui->colorLabel->setVisible(false);
         ui->colorBtn->setVisible(false);
         ui->bgColorLabel->setVisible(false);
-        ui->bgColorBtn->setVisible(false);
-        ui->colorPreview->setVisible(false);
+        ui->bgStyleCombo->setVisible(false);
+        ui->bgStyleHintLabel->setVisible(false);
+        ui->colorPreview->setVisible(true);
         m_currentColor = "#D8F7FF";
         m_currentBgColor = "#07111F";
+        setFontColor(m_currentColor);
+        setBgColor(m_currentBgColor);
         saveSettings();
         emit fontColorChanged(m_currentColor);
         emit bgColorChanged(m_currentBgColor);
@@ -320,7 +335,8 @@ void SettingsWidget::onModeChanged(int index)
         ui->colorLabel->setVisible(true);
         ui->colorBtn->setVisible(true);
         ui->bgColorLabel->setVisible(true);
-        ui->bgColorBtn->setVisible(true);
+        ui->bgStyleCombo->setVisible(true);
+        ui->bgStyleHintLabel->setVisible(true);
         ui->colorPreview->setVisible(true);
         ui->colorPreview->setStyleSheet(QString("background-color: %1; color: %2;")
                                         .arg(m_currentBgColor)
@@ -343,16 +359,15 @@ void SettingsWidget::onColorBtnClicked()
     }
 }
 
-void SettingsWidget::onBgColorBtnClicked()
+void SettingsWidget::onBgStyleChanged(int index)
 {
-    QColor color = QColorDialog::getColor(QColor(m_currentBgColor), this, "选择背景颜色");
-    if (color.isValid()) {
-        m_currentBgColor = color.name();
-        setBgColor(m_currentBgColor);
-
-        saveSettings();
-        emit bgColorChanged(m_currentBgColor);
-    }
+    m_currentBgColor = (index == 0) ? "#07111F" : "#F5FBFF";
+    m_currentColor = (index == 0) ? "#D8F7FF" : "#0F2740";
+    setBgColor(m_currentBgColor);
+    setFontColor(m_currentColor);
+    saveSettings();
+    emit bgColorChanged(m_currentBgColor);
+    emit fontColorChanged(m_currentColor);
 }
 
 void SettingsWidget::onSelectAllChatClicked()

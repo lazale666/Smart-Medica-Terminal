@@ -35,6 +35,8 @@ private slots:
 private:
     void sendMessage(const QString &message);
     void initConnections();
+    void appendChatMessage(const QString &sender, const QString &message, bool isSelf);
+    void appendSystemMessage(const QString &message);
 
 private:
     Ui::DoctorChatWidget *ui;

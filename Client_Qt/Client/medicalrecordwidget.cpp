@@ -82,10 +82,10 @@ void MedicalRecordWidget::applyModeSettings(const QString &mode)
     QFont titleFont = ui->titleLabel->font();
     
     if (mode == "关怀模式") {
-        font.setPointSize(font.pointSize() * 1.5);
-        labelFont.setPointSize(labelFont.pointSize() * 1.5);
-        btnFont.setPointSize(btnFont.pointSize() * 1.5);
-        titleFont.setPointSize(titleFont.pointSize() * 1.5);
+        font.setPointSize(16);
+        labelFont.setPointSize(15);
+        btnFont.setPointSize(15);
+        titleFont.setPointSize(22);
         
         ui->diseaseEdit->setFont(font);
         ui->dateEdit->setFont(labelFont);
@@ -100,6 +100,11 @@ void MedicalRecordWidget::applyModeSettings(const QString &mode)
         ui->diseaseLabel->setFont(labelFont);
         ui->dateLabel->setFont(labelFont);
         ui->treatmentLabel->setFont(labelFont);
+        ui->aiFillBtn->setMinimumHeight(52);
+        ui->saveBtn->setMinimumHeight(52);
+        ui->backBtn->setMinimumHeight(52);
+        ui->settingsBtn->setMinimumHeight(52);
+        ui->recordList->setSpacing(10);
     } else {
         font.setPointSize(10);
         labelFont.setPointSize(10);
@@ -119,6 +124,11 @@ void MedicalRecordWidget::applyModeSettings(const QString &mode)
         ui->diseaseLabel->setFont(labelFont);
         ui->dateLabel->setFont(labelFont);
         ui->treatmentLabel->setFont(labelFont);
+        ui->aiFillBtn->setMinimumHeight(36);
+        ui->saveBtn->setMinimumHeight(36);
+        ui->backBtn->setMinimumHeight(36);
+        ui->settingsBtn->setMinimumHeight(36);
+        ui->recordList->setSpacing(4);
     }
 }
 
@@ -132,7 +142,7 @@ void MedicalRecordWidget::applyFontColor(const QString &color)
 
 void MedicalRecordWidget::applyBgColor(const QString &color)
 {
-    m_bgColor = (color.compare("#ffffff", Qt::CaseInsensitive) == 0) ? "#07111F" : color;
+    m_bgColor = color;
     applyFontColor(m_fontColor);
     if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
         setStyleSheet(R"(
@@ -145,7 +155,15 @@ void MedicalRecordWidget::applyBgColor(const QString &color)
             }
         )");
     } else {
-        setStyleSheet(QString("QWidget#MedicalRecordWidget { background-color: %1; }").arg(m_bgColor));
+        setStyleSheet(R"(
+            QWidget#MedicalRecordWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F5FBFF, stop:0.55 #E9F6FF, stop:1 #DCEEFF);
+            }
+            QLabel#titleLabel, QLabel#recordListLabel {
+                color: #0F2740;
+                font-weight: 700;
+            }
+        )");
     }
 }
 
@@ -200,6 +218,10 @@ void MedicalRecordWidget::onFontColorChanged(const QString &color)
 void MedicalRecordWidget::onModeChanged(const QString &mode)
 {
     applyModeSettings(mode);
+    if (m_detailWidget) {
+        m_detailWidget->applyModeSettings(mode);
+    }
+    emit modeChanged(mode);
 }
 
 void MedicalRecordWidget::onBgColorChanged(const QString &color)

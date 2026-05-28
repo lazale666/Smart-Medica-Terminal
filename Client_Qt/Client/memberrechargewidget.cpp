@@ -3,21 +3,34 @@
 #include "facerecognizewidget.h"
 #include <QMessageBox>
 #include <QDebug>
+#include <QCoreApplication>
+#include <QFileInfo>
+#include <QPalette>
+#include <QPixmap>
+#include <QBrush>
 
 MemberRechargeWidget::MemberRechargeWidget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::MemberRechargeWidget)
     , m_isMember(false)
+    , m_lockedSize(1228, 694)
+    , m_currentMode("普通模式")
 {
     ui->setupUi(this);
+    m_bgPath = QCoreApplication::applicationDirPath() + "/photo/pay_money_background.png";
+    if (!QFileInfo::exists(m_bgPath)) {
+        m_bgPath = "D:/All Program/agant_example/Smart-Medica-Terminal/Client_Qt/Client/photo/pay_money_background.png";
+    }
+
+    setFixedSize(m_lockedSize);
     setStyleSheet(R"(
         QWidget#MemberRechargeWidget {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+            background: transparent;
         }
         QWidget#cardWidget {
-            background: rgba(2, 9, 20, 0.82);
+            background: rgba(2, 9, 20, 0.68);
             border: 1px solid rgba(0, 229, 255, 0.42);
-            border-radius: 22px;
+            border-radius: 24px;
         }
         QPushButton#backBtn {
             background: rgba(6, 24, 45, 0.92);
@@ -33,6 +46,7 @@ MemberRechargeWidget::MemberRechargeWidget(QWidget *parent)
     ui->cardDesc1->setText("<p align='center'><span style='font-size:14pt; color:#D8F7FF;'>尊享名医在线咨询</span></p>");
     ui->cardDesc2->setText("<p align='center'><span style='font-size:14pt; color:#D8F7FF;'>获取专属医疗服务</span></p>");
     ui->priceLabel->setText("<p align='center'><span style='font-size:28pt; font-weight:700; color:#FFCF5A;'>￥99.00</span></p>");
+    updateBackground();
 
     m_settings = new QSettings("SmartMedica", "Client", this);
 
@@ -45,10 +59,39 @@ MemberRechargeWidget::~MemberRechargeWidget()
     delete ui;
 }
 
+void MemberRechargeWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    updateBackground();
+}
+
 void MemberRechargeWidget::setUsername(const QString &username)
 {
     m_username = username;
     loadMemberStatus();
+}
+
+void MemberRechargeWidget::applyModeSettings(const QString &mode)
+{
+    m_currentMode = mode;
+
+    if (mode == "关怀模式") {
+        ui->titleLabel->setText("<p align='center'><span style='font-size:30pt; font-weight:700; color:#00E5FF;'>开通会员</span></p>");
+        ui->cardTitle->setText("<p align='center'><span style='font-size:24pt; font-weight:700; color:#31FFB7;'>医疗智能体会员</span></p>");
+        ui->cardDesc1->setText("<p align='center'><span style='font-size:18pt; color:#D8F7FF;'>尊享名医在线咨询</span></p>");
+        ui->cardDesc2->setText("<p align='center'><span style='font-size:18pt; color:#D8F7FF;'>获取专属医疗服务</span></p>");
+        ui->priceLabel->setText("<p align='center'><span style='font-size:34pt; font-weight:700; color:#FFCF5A;'>￥99.00</span></p>");
+        ui->backBtn->setMinimumHeight(56);
+        ui->purchaseBtn->setMinimumHeight(70);
+    } else {
+        ui->titleLabel->setText("<p align='center'><span style='font-size:24pt; font-weight:700; color:#00E5FF;'>开通会员</span></p>");
+        ui->cardTitle->setText("<p align='center'><span style='font-size:20pt; font-weight:700; color:#31FFB7;'>医疗智能体会员</span></p>");
+        ui->cardDesc1->setText("<p align='center'><span style='font-size:14pt; color:#D8F7FF;'>尊享名医在线咨询</span></p>");
+        ui->cardDesc2->setText("<p align='center'><span style='font-size:14pt; color:#D8F7FF;'>获取专属医疗服务</span></p>");
+        ui->priceLabel->setText("<p align='center'><span style='font-size:28pt; font-weight:700; color:#FFCF5A;'>￥99.00</span></p>");
+        ui->backBtn->setMinimumHeight(40);
+        ui->purchaseBtn->setMinimumHeight(50);
+    }
 }
 
 void MemberRechargeWidget::loadMemberStatus()
@@ -124,4 +167,21 @@ void MemberRechargeWidget::onPurchaseBtnClicked()
         faceWidget->close();
     });
     faceWidget->show();
+}
+
+void MemberRechargeWidget::updateBackground()
+{
+    if (m_bgPath.isEmpty()) {
+        return;
+    }
+
+    QPixmap background(m_bgPath);
+    if (background.isNull()) {
+        return;
+    }
+
+    QPalette palette;
+    palette.setBrush(QPalette::Window, QBrush(background.scaled(size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
+    setPalette(palette);
+    setAutoFillBackground(true);
 }

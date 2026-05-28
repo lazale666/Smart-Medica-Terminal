@@ -244,7 +244,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="colorBtn">
+         <widget class="QPushButton" name="colorBtn">
            <property name="text">
             <string>选择颜色</string>
            </property>
@@ -258,18 +258,35 @@
             </font>
            </property>
            <property name="text">
-            <string>背景颜色：</string>
+            <string>背景样式：</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="bgColorBtn">
-           <property name="text">
-            <string>选择颜色</string>
-           </property>
+          <widget class="QComboBox" name="bgStyleCombo">
+           <item>
+            <property name="text">
+             <string>深色样式</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>浅色样式</string>
+            </property>
+           </item>
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="bgStyleHintLabel">
+         <property name="text">
+          <string>浅色样式会切换为明亮背景与深色文字，深色样式保持当前赛博深色界面。</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QLabel" name="colorPreview">

@@ -29,6 +29,7 @@ public:
 signals:
     void backToMenu();
     void logout();
+    void modeChanged(const QString &mode);
 
 private slots:
     void onAiFillBtnClicked();

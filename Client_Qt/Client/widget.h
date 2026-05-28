@@ -11,6 +11,7 @@
 #include <QListWidgetItem>
 #include <QSettings>
 #include <QTextToSpeech>
+#include <functional>
 #include "dialog.h"
 #include "audio.h"
 #include "speech.h"
@@ -62,6 +63,7 @@ signals:
     void backToMenu();
     void logout();
     void sendInfo(int count);
+    void modeChanged(const QString &mode);
 
 private:
     void loadSettings();
@@ -71,6 +73,11 @@ private:
     void loadChatHistory(const QString &fileName);
     void refreshHistoryList();
     QString getHistoryDir() const;
+    void appendChatMessage(const QString &sender, const QString &message, bool isSelf);
+    void appendSystemMessage(const QString &message);
+    void appendHistorySeparator(bool isTop);
+    void setSocketHandlersActive(bool active);
+    void leaveChatScene(const std::function<void()> &afterCleanup);
 
 private:
     Ui::Widget *ui;

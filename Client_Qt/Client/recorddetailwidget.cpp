@@ -60,10 +60,11 @@ void RecordDetailWidget::applyModeSettings(const QString &mode)
     QFont titleFont = ui->titleLabel->font();
     
     if (mode == "关怀模式") {
-        font.setPointSize(font.pointSize() * 1.5);
-        labelFont.setPointSize(labelFont.pointSize() * 1.5);
-        btnFont.setPointSize(btnFont.pointSize() * 1.5);
-        titleFont.setPointSize(titleFont.pointSize() * 1.5);
+        resize(920, 760);
+        font.setPointSize(16);
+        labelFont.setPointSize(15);
+        btnFont.setPointSize(15);
+        titleFont.setPointSize(22);
         
         ui->diseaseEdit->setFont(font);
         ui->dateEdit->setFont(labelFont);
@@ -73,7 +74,11 @@ void RecordDetailWidget::applyModeSettings(const QString &mode)
         ui->diseaseLabel->setFont(labelFont);
         ui->dateLabel->setFont(labelFont);
         ui->treatmentLabel->setFont(labelFont);
+        ui->closeBtn->setMinimumHeight(52);
+        ui->diseaseEdit->setMinimumHeight(50);
+        ui->treatmentEdit->setMinimumHeight(220);
     } else {
+        resize(720, 560);
         font.setPointSize(10);
         labelFont.setPointSize(10);
         btnFont.setPointSize(10);
@@ -87,6 +92,9 @@ void RecordDetailWidget::applyModeSettings(const QString &mode)
         ui->diseaseLabel->setFont(labelFont);
         ui->dateLabel->setFont(labelFont);
         ui->treatmentLabel->setFont(labelFont);
+        ui->closeBtn->setMinimumHeight(36);
+        ui->diseaseEdit->setMinimumHeight(0);
+        ui->treatmentEdit->setMinimumHeight(0);
     }
 }
 

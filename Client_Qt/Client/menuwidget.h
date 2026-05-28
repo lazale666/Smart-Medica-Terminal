@@ -18,6 +18,7 @@ public:
     ~MenuWidget();
 
     void setUsername(const QString &username);
+    QString getUsername() const;
     void setServerInfo(const QString &ip, int port);
     void disconnectFromServer();
     void applyFontColor(const QString &color);
@@ -26,11 +27,14 @@ public:
 signals:
     void openChat(const QString &serverIP, int serverPort, bool autoConnect);
     void openMedicalRecord(const QString &serverIP, int serverPort, bool autoConnect);
+    void openDoctorChat(const QString &serverIP, int serverPort);
     void logout();
 
 private slots:
     void onChatBtnClicked();
     void onMedicalRecordBtnClicked();
+    void onDoctorChatBtnClicked();
+    void onMemberRechargeBtnClicked();
     void onSettingsBtnClicked();
     void onLogoutBtnClicked();
     void onSocketConnected();

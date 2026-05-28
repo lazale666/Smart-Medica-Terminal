@@ -27,6 +27,8 @@ MenuWidget::MenuWidget(QWidget *parent) :
 
     connect(ui->chatBtn, &QPushButton::clicked, this, &MenuWidget::onChatBtnClicked);
     connect(ui->medicalRecordBtn, &QPushButton::clicked, this, &MenuWidget::onMedicalRecordBtnClicked);
+    connect(ui->doctorChatBtn, &QPushButton::clicked, this, &MenuWidget::onDoctorChatBtnClicked);
+    connect(ui->memberRechargeBtn, &QPushButton::clicked, this, &MenuWidget::onMemberRechargeBtnClicked);
     connect(ui->settingsBtn, &QPushButton::clicked, this, &MenuWidget::onSettingsBtnClicked);
     connect(ui->logoutBtn, &QPushButton::clicked, this, &MenuWidget::onLogoutBtnClicked);
 
@@ -43,6 +45,11 @@ void MenuWidget::setUsername(const QString &username)
 {
     m_username = username;
     ui->userLabel->setText("当前用户：" + username);
+}
+
+QString MenuWidget::getUsername() const
+{
+    return m_username;
 }
 
 void MenuWidget::setServerInfo(const QString &ip, int port)
@@ -181,4 +188,14 @@ void MenuWidget::showEvent(QShowEvent *event)
     if (m_autoConnect) {
         connectToServer();
     }
+}
+
+void MenuWidget::onDoctorChatBtnClicked()
+{
+    emit openDoctorChat(m_serverIP, m_serverPort);
+}
+
+void MenuWidget::onMemberRechargeBtnClicked()
+{
+    QMessageBox::information(this, "会员充值", "会员充值功能开发中...");
 }

@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QString>
 
 namespace Ui {
 class LoginWidget;
@@ -17,13 +18,15 @@ public:
     explicit LoginWidget(QWidget *parent = nullptr);
     ~LoginWidget();
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 signals:
     void loginSuccess(const QString &username);
 
 private slots:
     void on_loginBtn_clicked();
     void on_registerBtn_clicked();
-    void on_clearBtn_clicked();
 
 private:
     Ui::LoginWidget *ui;
@@ -31,8 +34,10 @@ private:
     bool registerUser(const QString &username, const QString &password);
     bool loadUsers();
     bool saveUsers();
+    void updateBackground();
 
     QJsonObject users;
+    QString m_bgPath;
 };
 
 #endif // LOGINWIDGET_H

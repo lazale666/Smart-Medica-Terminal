@@ -11,7 +11,7 @@
     </rect>
   </property>
   <property name="windowTitle">
-    <string>茯苓 - 医疗智能助手</string>
+    <string>创伤小组 - 医疗智能助手</string>
   </property>
   <layout class="QHBoxLayout" name="mainLayout">
 

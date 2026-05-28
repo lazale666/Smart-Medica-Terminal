@@ -29,6 +29,10 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     connect(ui->colorBtn, &QPushButton::clicked, this, &SettingsWidget::onColorBtnClicked);
     connect(ui->bgColorBtn, &QPushButton::clicked, this, &SettingsWidget::onBgColorBtnClicked);
     connect(ui->saveServerBtn, &QPushButton::clicked, this, &SettingsWidget::onSaveServerBtnClicked);
+    connect(ui->saveUserInfoBtn, &QPushButton::clicked, this, &SettingsWidget::onSaveUserInfoBtnClicked);
+
+    connect(ui->volumeSlider, &QSlider::valueChanged, this, &SettingsWidget::onVolumeSliderChanged);
+    connect(ui->rateSlider, &QSlider::valueChanged, this, &SettingsWidget::onRateSliderChanged);
 
     connect(ui->selectAllChatBtn, &QPushButton::clicked, this, &SettingsWidget::onSelectAllChatClicked);
     connect(ui->deleteChatBtn, &QPushButton::clicked, this, &SettingsWidget::onDeleteChatClicked);
@@ -117,10 +121,25 @@ void SettingsWidget::loadSettings()
     quint16 port = m_settings->value("serverPort", 9999).toUInt();
     bool autoConnect = m_settings->value("autoConnect", true).toBool();
 
+    QString gender = m_settings->value("gender", "保密").toString();
+    int age = m_settings->value("age", 0).toInt();
+
+    int volume = m_settings->value("speechVolume", 100).toInt();
+    int rate = m_settings->value("speechRate", 50).toInt();
+
     setCurrentMode(mode);
     setBgColor(bgColor);
     setFontColor(color);
     setServerConfig(ip, port, autoConnect);
+
+    int genderIndex = 2; // 默认保密
+    if (gender == "男") genderIndex = 0;
+    else if (gender == "女") genderIndex = 1;
+    ui->genderCombo->setCurrentIndex(genderIndex);
+    ui->ageSpinBox->setValue(age);
+
+    ui->volumeSlider->setValue(volume);
+    ui->rateSlider->setValue(rate);
 }
 
 void SettingsWidget::saveSettings()
@@ -132,6 +151,18 @@ void SettingsWidget::saveSettings()
     m_settings->setValue("serverPort", ui->portEdit->text().toUInt());
     m_settings->setValue("autoConnect", ui->autoConnectCheck->isChecked());
     m_settings->sync();
+}
+
+void SettingsWidget::onSaveUserInfoBtnClicked()
+{
+    QString gender = ui->genderCombo->currentText();
+    int age = ui->ageSpinBox->value();
+
+    m_settings->setValue("gender", gender);
+    m_settings->setValue("age", age);
+    m_settings->sync();
+
+    QMessageBox::information(this, "提示", "用户信息已保存！");
 }
 
 void SettingsWidget::loadChatRecords()
@@ -379,4 +410,32 @@ void SettingsWidget::onDeleteMedicalClicked()
 
         QMessageBox::information(this, "删除成功", QString("成功删除 %1 条病例记录").arg(deletedCount));
     }
+}
+
+void SettingsWidget::onVolumeSliderChanged(int value)
+{
+    ui->volumeValueLabel->setText(QString::number(value) + "%");
+
+    double volume = value / 100.0;
+    m_settings->setValue("speechVolume", value);
+
+    emit speechSettingsChanged(volume, ui->rateSlider->value() / 50.0 - 1.0);
+}
+
+void SettingsWidget::onRateSliderChanged(int value)
+{
+    QString rateText;
+    if (value < 30) {
+        rateText = "慢";
+    } else if (value < 70) {
+        rateText = "中";
+    } else {
+        rateText = "快";
+    }
+    ui->rateValueLabel->setText(rateText);
+
+    double rate = value / 50.0 - 1.0;
+    m_settings->setValue("speechRate", value);
+
+    emit speechSettingsChanged(ui->volumeSlider->value() / 100.0, rate);
 }

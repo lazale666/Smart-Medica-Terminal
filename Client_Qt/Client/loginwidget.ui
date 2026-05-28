@@ -2,16 +2,8 @@
 <ui version="4.0">
  <class>LoginWidget</class>
  <widget class="QWidget" name="LoginWidget">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>420</width>
-    <height>320</height>
-   </rect>
-  </property>
   <property name="windowTitle">
-   <string>茯苓 - 医疗智能体</string>
+   <string>夜之城创伤小组 - 医疗智能体</string>
   </property>
   <property name="styleSheet">
    <string notr="true"/>
@@ -38,26 +30,22 @@
       <font>
        <family>Microsoft YaHei</family>
        <pointsize>28</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
      <property name="text">
-      <string>茯苓</string>
+      <string>夜之城创伤小组</string>
      </property>
      <property name="alignment">
-      <set>Qt::AlignCenter</set>
+      <set>Qt::AlignmentFlag::AlignCenter</set>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: white;</string>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QLineEdit" name="usernameEdit">
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>38</height>
-      </size>
-     </property>
      <property name="font">
       <font>
        <pointsize>11</pointsize>
@@ -70,19 +58,13 @@
    </item>
    <item>
     <widget class="QLineEdit" name="passwordEdit">
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>38</height>
-      </size>
-     </property>
      <property name="font">
       <font>
        <pointsize>11</pointsize>
       </font>
      </property>
      <property name="echoMode">
-      <enum>QLineEdit::Password</enum>
+      <enum>QLineEdit::EchoMode::Password</enum>
      </property>
      <property name="placeholderText">
       <string>请输入密码</string>
@@ -92,19 +74,15 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <property name="spacing">
-      <number>10</number>
+      <number>20</number>
      </property>
      <item>
       <widget class="QPushButton" name="loginBtn">
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>36</height>
-        </size>
-       </property>
        <property name="font">
         <font>
-         <pointsize>10</pointsize>
+         <pointsize>12</pointsize>
+         <weight>75</weight>
+         <bold>true</bold>
         </font>
        </property>
        <property name="text">
@@ -114,37 +92,15 @@
      </item>
      <item>
       <widget class="QPushButton" name="registerBtn">
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>36</height>
-        </size>
-       </property>
        <property name="font">
         <font>
-         <pointsize>10</pointsize>
+         <pointsize>12</pointsize>
+         <weight>75</weight>
+         <bold>true</bold>
         </font>
        </property>
        <property name="text">
         <string>注册</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="clearBtn">
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>36</height>
-        </size>
-       </property>
-       <property name="font">
-        <font>
-         <pointsize>10</pointsize>
-        </font>
-       </property>
-       <property name="text">
-        <string>清空</string>
        </property>
       </widget>
      </item>

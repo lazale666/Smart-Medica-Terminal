@@ -31,6 +31,7 @@ signals:
     void closeSettings();
     void cacheCleared();
     void connectNow(const QString &ip, quint16 port);
+    void speechSettingsChanged(double volume, double rate);
 
 private slots:
     void onLogoutBtnClicked();
@@ -47,6 +48,9 @@ private slots:
     void onDeleteMedicalClicked();
     void onBgColorBtnClicked();
     void onSaveServerBtnClicked();
+    void onSaveUserInfoBtnClicked();
+    void onVolumeSliderChanged(int value);
+    void onRateSliderChanged(int value);
 
 private:
     Ui::SettingsWidget *ui;

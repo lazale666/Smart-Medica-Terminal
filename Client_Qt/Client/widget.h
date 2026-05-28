@@ -10,6 +10,7 @@
 #include <QJsonObject>
 #include <QListWidgetItem>
 #include <QSettings>
+#include <QTextToSpeech>
 #include "dialog.h"
 #include "audio.h"
 #include "speech.h"
@@ -55,9 +56,11 @@ private slots:
     void onCloseSettings();
     void onServerConfigChanged(const QString &ip, quint16 port, bool autoConnect);
     void onLogoutFromSettings();
+    void onSpeechSettingsChanged(double volume, double rate);
 
 signals:
     void backToMenu();
+    void logout();
     void sendInfo(int count);
 
 private:
@@ -79,6 +82,7 @@ private:
     Dialog *dia;
     Audio *audio;
     Speech *speech;
+    QTextToSpeech *m_speech;
     QByteArray buffer;
     QString m_currentChatFile;
     QString m_username;

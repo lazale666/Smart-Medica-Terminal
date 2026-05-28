@@ -28,6 +28,7 @@ public:
 
 signals:
     void backToMenu();
+    void logout();
 
 private slots:
     void onAiFillBtnClicked();
@@ -42,6 +43,7 @@ private slots:
     void onModeChanged(const QString &mode);
     void onFontColorChanged(const QString &color);
     void onBgColorChanged(const QString &color);
+    void onLogoutFromSettings();
 
 private:
     void refreshRecordList();

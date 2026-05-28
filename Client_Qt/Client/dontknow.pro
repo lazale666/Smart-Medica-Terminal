@@ -1,4 +1,4 @@
-QT += widgets network multimedia
+QT += widgets network multimedia texttospeech
 
 CONFIG += c++17
 
@@ -9,6 +9,8 @@ CONFIG += c++17
 SOURCES += \
     audio.cpp \
     dialog.cpp \
+    doctordialog.cpp \
+    doctorlistwidget.cpp \
     http.cpp \
     loginwidget.cpp \
     main.cpp \
@@ -23,6 +25,8 @@ SOURCES += \
 HEADERS += \
     audio.h \
     dialog.h \
+    doctordialog.h \
+    doctorlistwidget.h \
     http.h \
     loginwidget.h \
     mainwindow.h \
@@ -35,6 +39,8 @@ HEADERS += \
 
 FORMS += \
     dialog.ui \
+    doctordialog.ui \
+    doctorlistwidget.ui \
     loginwidget.ui \
     mainwindow.ui \
     menuwidget.ui \

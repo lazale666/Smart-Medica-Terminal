@@ -2,6 +2,7 @@
 #include "loginwidget.h"
 #include "menuwidget.h"
 #include "medicalrecordwidget.h"
+#include "doctorlistwidget.h"
 
 #include <QApplication>
 #include <QSettings>
@@ -14,6 +15,7 @@ int main(int argc, char *argv[])
     MenuWidget *menu = new MenuWidget();
     Widget *chat = new Widget();
     MedicalRecordWidget *medicalRecord = new MedicalRecordWidget();
+    DoctorListWidget *doctorList = nullptr;
 
     QSettings settings("SmartMedica", "Client");
     QString savedMode = settings.value("mode", "普通模式").toString();
@@ -44,6 +46,22 @@ int main(int argc, char *argv[])
         medicalRecord->show();
     });
 
+    QObject::connect(menu, &MenuWidget::openDoctorChat, [&](const QString &serverIP, int serverPort) {
+        menu->hide();
+        if (doctorList) {
+            delete doctorList;
+        }
+        doctorList = new DoctorListWidget(serverIP, serverPort, menu->getUsername());
+        doctorList->setWindowTitle("医疗智能体 - 名医对话");
+        
+        QObject::connect(doctorList, &DoctorListWidget::backToMenu, [&]() {
+            doctorList->hide();
+            menu->show();
+        });
+        
+        doctorList->show();
+    });
+
     QObject::connect(menu, &MenuWidget::logout, [=]() {
         menu->hide();
         login->show();
@@ -54,12 +72,22 @@ int main(int argc, char *argv[])
         menu->show();
     });
 
+    QObject::connect(chat, &Widget::logout, [=]() {
+        chat->hide();
+        login->show();
+    });
+
     QObject::connect(medicalRecord, &MedicalRecordWidget::backToMenu, [=]() {
         medicalRecord->hide();
         menu->show();
     });
 
+    QObject::connect(medicalRecord, &MedicalRecordWidget::logout, [=]() {
+        medicalRecord->hide();
+        login->show();
+    });
+
     login->show();
 
-    return a.exec();
+    return QApplication::exec();
 }

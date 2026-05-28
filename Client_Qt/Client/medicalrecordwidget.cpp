@@ -142,6 +142,7 @@ void MedicalRecordWidget::onSettingsBtnClicked()
         settingsWidget->setFontColor(m_fontColor);
         settingsWidget->setBgColor(m_bgColor);
 
+        connect(settingsWidget, &SettingsWidget::logout, this, &MedicalRecordWidget::onLogoutFromSettings);
         connect(settingsWidget, &SettingsWidget::modeChanged, this, &MedicalRecordWidget::onModeChanged);
         connect(settingsWidget, &SettingsWidget::fontColorChanged, this, &MedicalRecordWidget::onFontColorChanged);
         connect(settingsWidget, &SettingsWidget::bgColorChanged, this, &MedicalRecordWidget::onBgColorChanged);
@@ -160,6 +161,16 @@ void MedicalRecordWidget::onSettingsBtnClicked()
     settingsWidget->show();
     settingsWidget->raise();
     settingsWidget->activateWindow();
+}
+
+void MedicalRecordWidget::onLogoutFromSettings()
+{
+    if (settingsWidget) {
+        settingsWidget->close();
+        delete settingsWidget;
+        settingsWidget = nullptr;
+    }
+    emit logout();
 }
 
 void MedicalRecordWidget::onFontColorChanged(const QString &color)

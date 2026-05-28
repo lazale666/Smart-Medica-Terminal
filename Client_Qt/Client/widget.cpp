@@ -20,6 +20,7 @@ Widget::Widget(QWidget *parent)
     dia = new Dialog(this);
     audio = new Audio(this);
     speech = new Speech();
+    m_speech = new QTextToSpeech(this);
     msg->close();
 
     m_settings = new QSettings("SmartMedica", "Client", this);
@@ -293,8 +294,8 @@ void Widget::readData()
 
                 m_isThinking = false;
                 ui->pushButton->setText("发送");
-                ui->textBrowser->append("🤖 茯苓：" + content);
-                saveChatMessage("茯苓", content);
+                ui->textBrowser->append("🤖 创伤小组：" + content);
+                saveChatMessage("创伤小组", content);
             }
         }
     }
@@ -468,7 +469,7 @@ void Widget::loadChatHistory(const QString &fileName)
             if (role == "我")
                 ui->textBrowser->append("👤 我：" + content);
             else
-                ui->textBrowser->append("🤖 茯苓：" + content);
+                ui->textBrowser->append("🤖 创伤小组：" + content);
         }
     }
     ui->textBrowser->append("--------------------------------------------------");
@@ -487,13 +488,14 @@ void Widget::onSettingsBtnClicked()
         settingsWidget->setFontColor(m_fontColor);
         settingsWidget->setBgColor(m_bgColor);
 
-        connect(settingsWidget, &SettingsWidget::logout, this, &Widget::onLogout);
+        connect(settingsWidget, &SettingsWidget::logout, this, &Widget::onLogoutFromSettings);
         connect(settingsWidget, &SettingsWidget::modeChanged, this, &Widget::onModeChanged);
         connect(settingsWidget, &SettingsWidget::fontColorChanged, this, &Widget::onFontColorChanged);
         connect(settingsWidget, &SettingsWidget::bgColorChanged, this, &Widget::onBgColorChanged);
         connect(settingsWidget, &SettingsWidget::serverConfigChanged, this, &Widget::onServerConfigChanged);
         connect(settingsWidget, &SettingsWidget::closeSettings, this, &Widget::onCloseSettings);
         connect(settingsWidget, &SettingsWidget::cacheCleared, this, &Widget::onCacheCleared);
+        connect(settingsWidget, &SettingsWidget::speechSettingsChanged, this, &Widget::onSpeechSettingsChanged);
         connect(settingsWidget, &SettingsWidget::destroyed, this, [=]() {
             settingsWidget = nullptr;
         });
@@ -511,6 +513,16 @@ void Widget::onLogout()
         settingsWidget = nullptr;
     }
     emit backToMenu();
+}
+
+void Widget::onLogoutFromSettings()
+{
+    if (settingsWidget) {
+        settingsWidget->close();
+        delete settingsWidget;
+        settingsWidget = nullptr;
+    }
+    emit logout();
 }
 
 void Widget::onModeChanged(const QString &mode)
@@ -549,12 +561,10 @@ void Widget::onCloseSettings()
     }
 }
 
-void Widget::onLogoutFromSettings()
+void Widget::onSpeechSettingsChanged(double volume, double rate)
 {
-    if (socket->state() == QTcpSocket::ConnectedState) {
-        socket->disconnectFromHost();
-    }
-    emit backToMenu();
+    m_speech->setVolume(volume);
+    m_speech->setRate(rate);
 }
 
 void Widget::onReadBtnClicked()
@@ -565,30 +575,48 @@ void Widget::onReadBtnClicked()
         return;
     }
 
+    if (m_speech->state() == QTextToSpeech::Speaking) {
+        m_speech->stop();
+        ui->readBtn->setText("🔊 朗读");
+        return;
+    }
+
     ui->textBrowser->append("🔊 正在朗读...");
 
     QString lastMessage = "";
     QStringList lines = text.split("\n");
     for (int i = lines.size() - 1; i >= 0; i--) {
         QString line = lines[i].trimmed();
-        if (line.startsWith("🤖 茯苓：")) {
-            lastMessage = line.mid(5);
+        if (line.startsWith("🤖 创伤小组：")) {
+            lastMessage = line.mid(5).trimmed();
             break;
         }
     }
 
     if (lastMessage.isEmpty()) {
-        lastMessage = text.right(200);
+        lastMessage = text.right(200).trimmed();
     }
+
+    if (lastMessage.isEmpty()) {
+        QMessageBox::information(this, "提示", "没有找到可朗读的内容");
+        return;
+    }
+
+    QSettings settings("SmartMedica", "Client");
+    double volume = settings.value("speechVolume", 1.0).toDouble();
+    double rate = settings.value("speechRate", 0.0).toDouble();
+
+    m_speech->setVolume(volume);
+    m_speech->setRate(rate);
 
     ui->readBtn->setText("⏹️ 停止");
-    QApplication::processEvents();
 
-    if (speech->textToSpeech(lastMessage, "tts.wav")) {
-        speech->playAudio("tts.wav");
-    }
-
-    ui->readBtn->setText("🔊 朗读");
+    m_speech->say(lastMessage);
+    connect(m_speech, &QTextToSpeech::stateChanged, this, [=](QTextToSpeech::State state) {
+        if (state == QTextToSpeech::Ready) {
+            ui->readBtn->setText("🔊 朗读");
+        }
+    });
 }
 
 void Widget::onCacheCleared()

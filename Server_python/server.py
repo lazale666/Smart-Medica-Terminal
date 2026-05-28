@@ -5,6 +5,8 @@ import threading
 import logging
 import subprocess
 import time
+import sqlite3
+import os
 from langchain_ollama import ChatOllama
 
 logging.basicConfig(
@@ -18,8 +20,69 @@ ollm = None
 model_name = "qwen2.5:7b"
 server_running = True
 clients = []
+doctors = []
 clients_lock = threading.Lock()
+database_path = "smart_medica.db"
 
+def init_database():
+    """Initialize SQLite database"""
+    conn = sqlite3.connect(database_path)
+    cursor = conn.cursor()
+    
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'client'
+    )''')
+    
+    cursor.execute('''CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id TEXT NOT NULL,
+        doctor_id TEXT,
+        start_time TEXT NOT NULL,
+        end_time TEXT
+    )''')
+    
+    cursor.execute('''CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER,
+        sender TEXT NOT NULL,
+        content TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+    )''')
+    
+    conn.commit()
+    conn.close()
+    logger.info("[OK] Database initialized")
+
+def add_user(username, password, role='client'):
+    """Add user to database"""
+    try:
+        conn = sqlite3.connect(database_path)
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+                      (username, password, role))
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False
+
+def verify_user(username, password, role=None):
+    """Verify user credentials"""
+    conn = sqlite3.connect(database_path)
+    cursor = conn.cursor()
+    if role:
+        cursor.execute('SELECT * FROM users WHERE username=? AND password=? AND role=?',
+                      (username, password, role))
+    else:
+        cursor.execute('SELECT * FROM users WHERE username=? AND password=?',
+                      (username, password))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
 
 def init_ollama():
     """Initialize ollama model"""
@@ -45,7 +108,6 @@ def init_ollama():
         logger.error(f"[ERROR] AI model loading failed: {e}")
         raise
 
-
 def process_with_ollama(message: str) -> str:
     """Process message with ollama model"""
     global ollm
@@ -64,12 +126,39 @@ def process_with_ollama(message: str) -> str:
         logger.error("[ERROR] Model processing error: %s", e)
         return f"Sorry, an error occurred while processing the message: {str(e)}"
 
+def send_response(client_socket, msg_dict):
+    """Send response to client"""
+    try:
+        json_str = json.dumps(msg_dict, ensure_ascii=False)
+        json_bytes = json_str.encode('utf-8')
+        header = struct.pack('>I', len(json_bytes))
+        client_socket.sendall(header + json_bytes)
+    except Exception as e:
+        logger.error(f"Failed to send response: {e}")
+
+def get_online_doctors():
+    """Get list of online doctors"""
+    online_doctors = []
+    with clients_lock:
+        logger.info(f"[DEBUG] get_online_doctors called, doctors count: {len(doctors)}")
+        for doctor in doctors:
+            online_doctors.append({
+                'id': id(doctor['socket']),
+                'name': doctor.get('name', 'Unknown'),
+                'online': True
+            })
+            logger.info(f"[DEBUG] Adding doctor: {doctor.get('name', 'Unknown')}")
+    logger.info(f"[DEBUG] Returning {len(online_doctors)} online doctors")
+    return online_doctors
 
 def handle_client(client_socket, addr):
     """Handle single client connection"""
     logger.info(f"New client connected: {addr}")
     buffer = b""
     client_socket.settimeout(120)
+    client_info = {'socket': client_socket, 'addr': addr, 'name': None, 'role': 'client'}
+    current_doctor = None
+    current_client = None
 
     try:
         while server_running:
@@ -95,9 +184,49 @@ def handle_client(client_socket, addr):
 
                     try:
                         msg_dict = json.loads(json_data.decode('utf-8'))
-                        logger.info(f"Received message type from {addr}: {msg_dict.get('type', 'unknown')}")
+                        msg_type = msg_dict.get('type', 'unknown')
+                        logger.info(f"Received message type from {addr}: {msg_type}")
 
-                        if msg_dict.get('type') == 'message':
+                        if msg_dict.get('type') == 'login':
+                            username = msg_dict.get('username')
+                            password = msg_dict.get('password')
+                            role = msg_dict.get('role', 'client')
+                            logger.info(f"[DEBUG] Login attempt: username={username}, role={role}")
+                            
+                            if not verify_user(username, password, role):
+                                if role == 'doctor':
+                                    add_user(username, password, role)
+                                    logger.info(f"Doctor {username} auto registered")
+                            
+                            if verify_user(username, password, role):
+                                client_info['name'] = username
+                                client_info['role'] = role
+                                client_info['current_client'] = None
+                                client_info['current_doctor'] = None
+                                
+                                if role == 'doctor':
+                                    with clients_lock:
+                                        doctors.append(client_info)
+                                    send_response(client_socket, {'type': 'login_success', 'message': 'Doctor logged in', 'name': username})
+                                    logger.info(f"Doctor {username} logged in, total doctors: {len(doctors)}")
+                                else:
+                                    send_response(client_socket, {'type': 'login_success', 'message': 'Client logged in', 'name': username})
+                                    logger.info(f"Client {username} logged in")
+                            else:
+                                send_response(client_socket, {'type': 'login_failed', 'message': 'Invalid credentials'})
+                                logger.warning(f"Login failed for {username}")
+
+                        elif msg_dict.get('type') == 'register':
+                            username = msg_dict.get('username')
+                            password = msg_dict.get('password')
+                            role = msg_dict.get('role', 'client')
+                            
+                            if add_user(username, password, role):
+                                send_response(client_socket, {'type': 'register_success', 'message': 'Registration successful'})
+                            else:
+                                send_response(client_socket, {'type': 'register_failed', 'message': 'Username already exists'})
+
+                        elif msg_dict.get('type') == 'message':
                             user_message = msg_dict.get('data', '')
                             if not user_message:
                                 user_message = msg_dict.get('message', '')
@@ -116,6 +245,56 @@ def handle_client(client_socket, addr):
                             response_dict = {"type": "pong", "data": "connected"}
                             send_response(client_socket, response_dict)
 
+                        elif msg_dict.get('type') == 'get_doctors':
+                            logger.info(f"[DEBUG] get_doctors request received from {addr}")
+                            online_doctors = get_online_doctors()
+                            send_response(client_socket, {'type': 'doctor_list', 'doctors': online_doctors})
+
+                        elif msg_dict.get('type') == 'connect_doctor':
+                            doctor_id = msg_dict.get('doctor_id')
+                            logger.info(f"[DEBUG] connect_doctor request: doctor_id={doctor_id}")
+                            target_doctor = None
+                            
+                            with clients_lock:
+                                for doctor in doctors:
+                                    logger.info(f"[DEBUG] Checking doctor: id={id(doctor['socket'])}, target={doctor_id}")
+                                    if id(doctor['socket']) == doctor_id:
+                                        target_doctor = doctor
+                                        break
+                            
+                            if target_doctor:
+                                current_doctor = target_doctor
+                                client_info['current_doctor'] = target_doctor
+                                target_doctor['current_client'] = client_info
+                                
+                                send_response(client_socket, {'type': 'connection_success', 'message': 'Connected to doctor'})
+                                send_response(target_doctor['socket'], {
+                                    'type': 'new_client',
+                                    'client_name': client_info.get('name', 'Unknown')
+                                })
+                                logger.info(f"Connected client {client_info.get('name')} with doctor {target_doctor.get('name')}")
+                            else:
+                                send_response(client_socket, {'type': 'connection_failed', 'message': 'Doctor not available'})
+                                logger.warning(f"Doctor not found: {doctor_id}")
+
+                        elif msg_dict.get('type') == 'doctor_message':
+                            if client_info['role'] == 'client' and client_info.get('current_doctor'):
+                                message = msg_dict.get('message')
+                                send_response(client_info['current_doctor']['socket'], {
+                                    'type': 'client_message',
+                                    'sender': client_info.get('name', 'client'),
+                                    'message': message
+                                })
+                                logger.info(f"Forwarded message from client {client_info.get('name')} to doctor")
+                            elif client_info['role'] == 'doctor' and client_info.get('current_client'):
+                                message = msg_dict.get('message')
+                                send_response(client_info['current_client']['socket'], {
+                                    'type': 'client_message',
+                                    'sender': client_info.get('name', 'doctor'),
+                                    'message': message
+                                })
+                                logger.info(f"Forwarded message from doctor {client_info.get('name')} to client")
+
                     except json.JSONDecodeError as e:
                         logger.error(f"JSON parsing failed: {e}")
                     except Exception as e:
@@ -128,25 +307,21 @@ def handle_client(client_socket, addr):
         logger.error(f"Client exception {addr}: {e}")
     finally:
         with clients_lock:
-            if client_socket in clients:
-                clients.remove(client_socket)
+            if client_info.get('role') == 'client' and client_info.get('current_doctor'):
+                client_info['current_doctor']['current_client'] = None
+            elif client_info.get('role') == 'doctor' and client_info.get('current_client'):
+                client_info['current_client']['current_doctor'] = None
+            
+            if client_socket in [c['socket'] for c in clients]:
+                clients.remove(client_info)
+            if client_info in doctors:
+                doctors.remove(client_info)
+                logger.info(f"Doctor {client_info.get('name')} disconnected, remaining doctors: {len(doctors)}")
         try:
             client_socket.close()
             logger.info(f"Connection closed: {addr}")
         except:
             pass
-
-
-def send_response(client_socket, msg_dict):
-    """Send response to client"""
-    try:
-        json_str = json.dumps(msg_dict, ensure_ascii=False)
-        json_bytes = json_str.encode('utf-8')
-        header = struct.pack('>I', len(json_bytes))
-        client_socket.sendall(header + json_bytes)
-    except Exception as e:
-        logger.error(f"Failed to send response: {e}")
-
 
 def start_server(host='0.0.0.0', port=9999):
     """Start TCP server"""
@@ -156,6 +331,7 @@ def start_server(host='0.0.0.0', port=9999):
     logger.info("AI Chat Server Starting...")
     logger.info("=" * 60)
 
+    init_database()
     init_ollama()
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -173,11 +349,9 @@ def start_server(host='0.0.0.0', port=9999):
             try:
                 client_socket, addr = server_socket.accept()
                 with clients_lock:
-                    clients.append(client_socket)
-                # ✅ 终极修复：Windows 必崩元凶，必须加 daemon=True
+                    clients.append({'socket': client_socket, 'addr': addr})
                 threading.Thread(target=handle_client, args=(client_socket, addr), daemon=True).start()
             except Exception as e:
-                # ✅ 修复：accept 报错不退出服务器
                 logger.error(f"Accept error: {e}")
                 continue
 
@@ -191,13 +365,17 @@ def start_server(host='0.0.0.0', port=9999):
         except:
             pass
         with clients_lock:
-            for client in clients:
+            for client_info in clients:
                 try:
-                    client.close()
+                    client_info['socket'].close()
+                except:
+                    pass
+            for doctor in doctors:
+                try:
+                    doctor['socket'].close()
                 except:
                     pass
         logger.info("[OK] Server closed")
-
 
 if __name__ == "__main__":
     start_server(port=9999)

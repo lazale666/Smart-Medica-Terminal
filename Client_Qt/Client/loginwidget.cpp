@@ -3,13 +3,49 @@
 #include <QMessageBox>
 #include <QFile>
 #include <QJsonDocument>
+#include <QPalette>
+#include <QPixmap>
+#include <QCoreApplication>
+#include <QFileInfo>
+#include <QResizeEvent>
 
 LoginWidget::LoginWidget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::LoginWidget)
+    , m_bgPath("")
 {
     ui->setupUi(this);
     loadUsers();
+
+    QString bgPath = QCoreApplication::applicationDirPath() + "/photo/background.png";
+    QFileInfo fileInfo(bgPath);
+    if (!fileInfo.exists() || !fileInfo.isFile()) {
+        bgPath = "D:/All Program/agant_example/Smart-Medica-Terminal/Client_Qt/Client/photo/background.png";
+    }
+    m_bgPath = bgPath;
+
+    setFixedSize(1017, 398);
+
+    updateBackground();
+}
+
+void LoginWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    updateBackground();
+}
+
+void LoginWidget::updateBackground()
+{
+    if (m_bgPath.isEmpty()) return;
+
+    QPixmap background(m_bgPath);
+    if (!background.isNull()) {
+        QPalette palette;
+        palette.setBrush(QPalette::Window, QBrush(background.scaled(this->size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
+        this->setPalette(palette);
+        this->setAutoFillBackground(true);
+    }
 }
 
 LoginWidget::~LoginWidget()
@@ -92,10 +128,4 @@ void LoginWidget::on_registerBtn_clicked()
     } else {
         QMessageBox::warning(this, "失败", "用户名已存在");
     }
-}
-
-void LoginWidget::on_clearBtn_clicked()
-{
-    ui->usernameEdit->clear();
-    ui->passwordEdit->clear();
 }

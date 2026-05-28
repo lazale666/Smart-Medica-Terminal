@@ -18,6 +18,7 @@ class FaceRecognizeWidget : public QWidget
 public:
     explicit FaceRecognizeWidget(const QString &username, QWidget *parent = nullptr);
     ~FaceRecognizeWidget();
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
 
 signals:
     void recognitionSuccess();
@@ -34,6 +35,9 @@ private:
     QTimer *m_firstTimer;
     QTimer *m_showImageTimer;
     QTimer *m_successTimer;
+    QString m_currentMode;
+    QString m_bgColor;
+    QString m_fontColor;
     
     void setupUI();
     void showFaceImage();

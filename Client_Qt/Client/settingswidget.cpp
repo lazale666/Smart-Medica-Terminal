@@ -1,13 +1,14 @@
 #include "settingswidget.h"
 #include "ui_settingswidget.h"
-#include <QMessageBox>
+#include "themehelpers.h"
+
 #include <QColorDialog>
 #include <QDir>
-#include <QSettings>
 #include <QFileInfo>
+#include <QListWidgetItem>
+#include <QMessageBox>
 #include <QTextStream>
 #include <QStringConverter>
-#include <QListWidgetItem>
 
 SettingsWidget::SettingsWidget(QWidget *parent)
     : QWidget(parent)
@@ -15,31 +16,6 @@ SettingsWidget::SettingsWidget(QWidget *parent)
 {
     ui->setupUi(this);
     setMinimumSize(720, 520);
-    setStyleSheet(R"(
-        QWidget#SettingsWidget {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
-        }
-        QStackedWidget, QWidget#userInfoPage, QWidget#modePage, QWidget#cachePage, QWidget#serverPage {
-            background: transparent;
-        }
-        QLabel {
-            color: #D8F7FF;
-            font-family: "Microsoft YaHei";
-        }
-        QLabel#usernameLabel, QLabel#cacheLabel, QLabel#serverLabel {
-            color: #00E5FF;
-            font-weight: 700;
-        }
-        QComboBox {
-            color: #EAFBFF;
-        }
-        QComboBox QAbstractItemView {
-            background: #F5FBFF;
-            color: #0F2740;
-            selection-background-color: #C7F4FF;
-            selection-color: #03111D;
-        }
-    )");
 
     m_settings = new QSettings("SmartMedica", "Client", this);
     m_currentColor = "#D8F7FF";
@@ -67,7 +43,6 @@ SettingsWidget::SettingsWidget(QWidget *parent)
 
     ui->navUserInfoBtn->setChecked(true);
     switchToPage(0);
-
     loadSettings();
 }
 
@@ -91,17 +66,9 @@ void SettingsWidget::setServerConfig(const QString &ip, quint16 port, bool autoC
 
 void SettingsWidget::setCurrentMode(const QString &mode)
 {
-    bool showColor = !(mode == "极简模式" || mode == "关怀模式");
-    ui->colorLabel->setVisible(showColor);
-    ui->colorBtn->setVisible(showColor);
-    ui->bgColorLabel->setVisible(showColor);
-    ui->bgStyleCombo->setVisible(showColor);
-    ui->bgStyleHintLabel->setVisible(showColor);
-    ui->colorPreview->setVisible(true);
-    
-    if (mode == "极简模式") {
+    if (mode == QStringLiteral("极简模式")) {
         ui->modeCombo->setCurrentIndex(1);
-    } else if (mode == "关怀模式") {
+    } else if (mode == QStringLiteral("关怀模式")) {
         ui->modeCombo->setCurrentIndex(2);
     } else {
         ui->modeCombo->setCurrentIndex(0);
@@ -110,26 +77,20 @@ void SettingsWidget::setCurrentMode(const QString &mode)
 
 void SettingsWidget::setFontColor(const QString &color)
 {
-    m_currentColor = color;
-    // 更新合并后的大预览
-    ui->colorPreview->setStyleSheet(QString("background-color: %1; color: %2;")
-                                    .arg(m_currentBgColor)
-                                    .arg(color));
+    m_currentColor = color.isEmpty() ? ThemeHelpers::defaultFontColorForBg(m_currentBgColor) : color;
+    updateTheme();
 }
 
 void SettingsWidget::setBgColor(const QString &color)
 {
-    m_currentBgColor = color;
-    ui->colorPreview->setStyleSheet(QString("background-color: %1; color: %2;")
-                                    .arg(color)
-                                    .arg(m_currentColor));
-    ui->bgStyleCombo->setCurrentIndex(color.compare("#07111F", Qt::CaseInsensitive) == 0 ? 0 : 1);
+    m_currentBgColor = ThemeHelpers::normalizeBgColor(color);
+    ui->bgStyleCombo->setCurrentIndex(ThemeHelpers::isLightTheme(m_currentBgColor) ? 1 : 0);
+    updateTheme();
 }
 
 void SettingsWidget::switchToPage(int pageIndex)
 {
     ui->pageStack->setCurrentIndex(pageIndex);
-
     ui->navUserInfoBtn->setChecked(pageIndex == 0);
     ui->navModeBtn->setChecked(pageIndex == 1);
     ui->navCacheBtn->setChecked(pageIndex == 2);
@@ -143,30 +104,31 @@ void SettingsWidget::switchToPage(int pageIndex)
 
 void SettingsWidget::loadSettings()
 {
-    QString mode = m_settings->value("mode", "普通模式").toString();
-    QString color = m_settings->value("fontColor", "#D8F7FF").toString();
-    QString bgColor = m_settings->value("bgColor", "#07111F").toString();
-    QString ip = m_settings->value("serverIP", "127.0.0.1").toString();
-    quint16 port = m_settings->value("serverPort", 9999).toUInt();
-    bool autoConnect = m_settings->value("autoConnect", true).toBool();
-
-    QString gender = m_settings->value("gender", "保密").toString();
-    int age = m_settings->value("age", 0).toInt();
-
-    int volume = m_settings->value("speechVolume", 100).toInt();
-    int rate = m_settings->value("speechRate", 50).toInt();
+    const QString mode = m_settings->value("mode", "普通模式").toString();
+    const QString bgColor = ThemeHelpers::normalizeBgColor(m_settings->value("bgColor", "#07111F").toString());
+    const QString color = m_settings->value("fontColor", ThemeHelpers::defaultFontColorForBg(bgColor)).toString();
+    const QString ip = m_settings->value("serverIP", "127.0.0.1").toString();
+    const quint16 port = m_settings->value("serverPort", 9999).toUInt();
+    const bool autoConnect = m_settings->value("autoConnect", true).toBool();
+    const QString gender = m_settings->value("gender", "保密").toString();
+    const int age = m_settings->value("age", 0).toInt();
+    const int volume = m_settings->value("speechVolume", 100).toInt();
+    const int rate = m_settings->value("speechRate", 50).toInt();
 
     setCurrentMode(mode);
     setBgColor(bgColor);
     setFontColor(color);
     setServerConfig(ip, port, autoConnect);
 
-    int genderIndex = 2; // 默认保密
-    if (gender == "男") genderIndex = 0;
-    else if (gender == "女") genderIndex = 1;
+    int genderIndex = 2;
+    if (gender == QStringLiteral("男")) {
+        genderIndex = 0;
+    } else if (gender == QStringLiteral("女")) {
+        genderIndex = 1;
+    }
+
     ui->genderCombo->setCurrentIndex(genderIndex);
     ui->ageSpinBox->setValue(age);
-
     ui->volumeSlider->setValue(volume);
     ui->rateSlider->setValue(rate);
 }
@@ -182,87 +144,146 @@ void SettingsWidget::saveSettings()
     m_settings->sync();
 }
 
+void SettingsWidget::updateTheme()
+{
+    const bool light = ThemeHelpers::isLightTheme(m_currentBgColor);
+    const QString mainText = light ? "#0F2740" : "#D8F7FF";
+    const QString panelBg = light ? "rgba(255, 255, 255, 0.78)" : "transparent";
+    const QString panelBorder = light ? "1px solid rgba(15, 39, 64, 0.12)" : "none";
+    const QString titleColor = ThemeHelpers::titleColor(m_currentBgColor);
+    const QString listBg = light ? "rgba(255, 255, 255, 0.92)" : "rgba(2, 9, 20, 0.82)";
+    const QString comboPopupBg = light ? "#FFFFFF" : "#081523";
+    const QString deleteButtonBg = light ? "#E86A73" : "#ff6b6b";
+
+    setStyleSheet(QString(R"(
+        QWidget#SettingsWidget {
+            background: %1;
+        }
+        QStackedWidget, QWidget#userInfoPage, QWidget#modePage, QWidget#cachePage, QWidget#serverPage {
+            background: transparent;
+        }
+        QLabel {
+            color: %2;
+            font-family: "Microsoft YaHei";
+        }
+        QLabel#usernameLabel, QLabel#cacheLabel, QLabel#serverLabel {
+            color: %3;
+            font-weight: 700;
+        }
+        QPushButton#navUserInfoBtn, QPushButton#navModeBtn, QPushButton#navCacheBtn, QPushButton#navServerBtn {
+            font-weight: 700;
+        }
+        QGroupBox {
+            background: %4;
+            border: %5;
+            border-radius: 16px;
+            margin-top: 12px;
+            color: %2;
+            font-weight: 700;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 14px;
+            padding: 0 8px;
+            color: %3;
+        }
+        QListWidget {
+            background: %6;
+            color: %2;
+            border: 1px solid rgba(0, 229, 255, 0.22);
+            border-radius: 14px;
+            padding: 8px;
+        }
+        QComboBox QAbstractItemView {
+            background: %7;
+            color: %2;
+            selection-background-color: #C7F4FF;
+            selection-color: #03111D;
+        }
+        QLabel#colorPreview {
+            background-color: %8;
+            color: %9;
+            border: 1px solid rgba(0, 229, 255, 0.22);
+            border-radius: 14px;
+        }
+        QPushButton#deleteChatBtn, QPushButton#deleteMedicalBtn {
+            background-color: %10;
+            color: white;
+            border: none;
+        }
+    )")
+        .arg(light
+                 ? "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F5FBFF, stop:0.55 #E9F6FF, stop:1 #DCEEFF)"
+                 : "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023)",
+             mainText,
+             titleColor,
+             panelBg,
+             panelBorder,
+             listBg,
+             comboPopupBg,
+             m_currentBgColor,
+             m_currentColor,
+             deleteButtonBg));
+
+    ui->colorPreview->setStyleSheet(QString("background-color: %1; color: %2; border-radius: 14px;").arg(m_currentBgColor, m_currentColor));
+}
+
 void SettingsWidget::onSaveUserInfoBtnClicked()
 {
-    QString gender = ui->genderCombo->currentText();
-    int age = ui->ageSpinBox->value();
-
-    m_settings->setValue("gender", gender);
-    m_settings->setValue("age", age);
+    m_settings->setValue("gender", ui->genderCombo->currentText());
+    m_settings->setValue("age", ui->ageSpinBox->value());
     m_settings->sync();
-
-    QMessageBox::information(nullptr, "提示", "用户信息已保存！");
+    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("用户信息已保存。"));
 }
 
 void SettingsWidget::loadChatRecords()
 {
     ui->chatRecordList->clear();
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString historyDir = appDir + "/chat_history";
+    const QString historyDir = QCoreApplication::applicationDirPath() + "/chat_history";
     QDir dir(historyDir);
-
     if (!dir.exists()) {
         return;
     }
 
-    QStringList filters;
-    filters << "chat_*.txt";
-    dir.setNameFilters(filters);
-    QFileInfoList fileList = dir.entryInfoList(QDir::Files, QDir::Time | QDir::Reversed);
-
+    dir.setNameFilters(QStringList() << "chat_*.txt");
+    const QFileInfoList fileList = dir.entryInfoList(QDir::Files, QDir::Time | QDir::Reversed);
     for (const QFileInfo &fileInfo : fileList) {
         QFile file(fileInfo.absoluteFilePath());
+        QString displayText = fileInfo.fileName();
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream in(&file);
             in.setEncoding(QStringConverter::Utf8);
-            QString firstLine = in.readLine();
+            const QString firstLine = in.readLine();
             file.close();
-
-            QString displayText = fileInfo.fileName();
             if (!firstLine.isEmpty()) {
-                QStringList parts = firstLine.split("|");
-                if (parts.size() >= 3 && parts[1] == "我") {
+                const QStringList parts = firstLine.split("|");
+                if (parts.size() >= 3 && parts[1] == QStringLiteral("我")) {
                     displayText = parts[2].left(30);
-                    if (parts[2].length() > 30) displayText += "...";
+                    if (parts[2].length() > 30) {
+                        displayText += "...";
+                    }
                 }
             }
-
-            QListWidgetItem *item = new QListWidgetItem(displayText);
-            item->setData(Qt::UserRole, fileInfo.fileName());
-            ui->chatRecordList->addItem(item);
         }
+
+        QListWidgetItem *item = new QListWidgetItem(displayText);
+        item->setData(Qt::UserRole, fileInfo.fileName());
+        ui->chatRecordList->addItem(item);
     }
 }
 
 void SettingsWidget::loadMedicalRecords()
 {
     ui->medicalRecordList->clear();
-    QString recordDir = QDir::homePath() + "/SmartMedica/records";
+    const QString recordDir = QDir::homePath() + "/SmartMedica/records";
     QDir dir(recordDir);
-
     if (!dir.exists()) {
         return;
     }
 
-    QStringList filters;
-    filters << "record_*.txt";
-    QStringList files = dir.entryList(filters, QDir::Files, QDir::Time);
-
+    const QStringList files = dir.entryList(QStringList() << "record_*.txt", QDir::Files, QDir::Time);
     for (const QString &fileName : files) {
-        QString filePath = dir.filePath(fileName);
-        QFile file(filePath);
-        
-        QString displayText = fileName;
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QTextStream in(&file);
-            QString line = in.readLine();
-            if (line.startsWith("疾病名称:")) {
-                displayText = fileName.mid(7, 8) + " " + line.mid(5);
-            }
-            file.close();
-        }
-
-        QListWidgetItem *item = new QListWidgetItem(displayText);
+        QListWidgetItem *item = new QListWidgetItem(fileName);
         item->setData(Qt::UserRole, fileName);
         ui->medicalRecordList->addItem(item);
     }
@@ -291,11 +312,8 @@ void SettingsWidget::onNavServerClicked()
 void SettingsWidget::onSaveServerBtnClicked()
 {
     saveSettings();
-    QString ip = ui->ipEdit->text();
-    quint16 port = ui->portEdit->text().toUInt();
-    bool autoConnect = ui->autoConnectCheck->isChecked();
-    emit serverConfigChanged(ip, port, autoConnect);
-    QMessageBox::information(nullptr, "提示", "服务器配置已保存");
+    emit serverConfigChanged(ui->ipEdit->text(), ui->portEdit->text().toUInt(), ui->autoConnectCheck->isChecked());
+    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
 }
 
 void SettingsWidget::onCloseBtnClicked()
@@ -306,9 +324,8 @@ void SettingsWidget::onCloseBtnClicked()
 
 void SettingsWidget::onLogoutBtnClicked()
 {
-    int ret = QMessageBox::question(nullptr, "确认退出", "确定要退出登录吗？",
-                                    QMessageBox::Yes | QMessageBox::No);
-    if (ret == QMessageBox::Yes) {
+    if (QMessageBox::question(nullptr, QStringLiteral("确认退出"), QStringLiteral("确定要退出登录吗？"),
+                              QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
         saveSettings();
         emit logout();
     }
@@ -316,55 +333,29 @@ void SettingsWidget::onLogoutBtnClicked()
 
 void SettingsWidget::onModeChanged(int index)
 {
-    QString mode = ui->modeCombo->itemText(index);
-    if (mode == "极简模式" || mode == "关怀模式") {
-        ui->colorLabel->setVisible(false);
-        ui->colorBtn->setVisible(false);
-        ui->bgColorLabel->setVisible(false);
-        ui->bgStyleCombo->setVisible(false);
-        ui->bgStyleHintLabel->setVisible(false);
-        ui->colorPreview->setVisible(true);
-        m_currentColor = "#D8F7FF";
-        m_currentBgColor = "#07111F";
-        setFontColor(m_currentColor);
-        setBgColor(m_currentBgColor);
-        saveSettings();
-        emit fontColorChanged(m_currentColor);
-        emit bgColorChanged(m_currentBgColor);
-    } else {
-        ui->colorLabel->setVisible(true);
-        ui->colorBtn->setVisible(true);
-        ui->bgColorLabel->setVisible(true);
-        ui->bgStyleCombo->setVisible(true);
-        ui->bgStyleHintLabel->setVisible(true);
-        ui->colorPreview->setVisible(true);
-        ui->colorPreview->setStyleSheet(QString("background-color: %1; color: %2;")
-                                        .arg(m_currentBgColor)
-                                        .arg(m_currentColor));
-    }
-
+    Q_UNUSED(index);
     saveSettings();
-    emit modeChanged(mode);
+    emit modeChanged(ui->modeCombo->currentText());
 }
 
 void SettingsWidget::onColorBtnClicked()
 {
-    QColor color = QColorDialog::getColor(QColor(m_currentColor), this, "选择字体颜色");
-    if (color.isValid()) {
-        m_currentColor = color.name();
-        setFontColor(m_currentColor);
-
-        saveSettings();
-        emit fontColorChanged(m_currentColor);
+    QColor color = QColorDialog::getColor(QColor(m_currentColor), this, QStringLiteral("选择字体颜色"));
+    if (!color.isValid()) {
+        return;
     }
+
+    m_currentColor = color.name();
+    updateTheme();
+    saveSettings();
+    emit fontColorChanged(m_currentColor);
 }
 
 void SettingsWidget::onBgStyleChanged(int index)
 {
     m_currentBgColor = (index == 0) ? "#07111F" : "#F5FBFF";
-    m_currentColor = (index == 0) ? "#D8F7FF" : "#0F2740";
-    setBgColor(m_currentBgColor);
-    setFontColor(m_currentColor);
+    m_currentColor = ThemeHelpers::defaultFontColorForBg(m_currentBgColor);
+    updateTheme();
     saveSettings();
     emit bgColorChanged(m_currentBgColor);
     emit fontColorChanged(m_currentColor);
@@ -379,33 +370,25 @@ void SettingsWidget::onSelectAllChatClicked()
 
 void SettingsWidget::onDeleteChatClicked()
 {
-    QList<QListWidgetItem*> selectedItems = ui->chatRecordList->selectedItems();
+    const QList<QListWidgetItem*> selectedItems = ui->chatRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(nullptr, "提示", "请先选择要删除的聊天记录");
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先选择要删除的聊天记录。"));
         return;
     }
 
-    int ret = QMessageBox::warning(nullptr, "确认删除", 
-        QString("确定要删除选中的 %1 条聊天记录吗？此操作不可恢复！").arg(selectedItems.size()),
-        QMessageBox::Yes | QMessageBox::No);
-    
-    if (ret == QMessageBox::Yes) {
-        QString appDir = QCoreApplication::applicationDirPath();
-        QString historyDir = appDir + "/chat_history";
-        QDir dir(historyDir);
-
-        int deletedCount = 0;
-        for (QListWidgetItem *item : selectedItems) {
-            QString fileName = item->data(Qt::UserRole).toString();
-            if (dir.remove(fileName)) {
-                deletedCount++;
-                delete item;
-            }
+    const QString historyDir = QCoreApplication::applicationDirPath() + "/chat_history";
+    QDir dir(historyDir);
+    int deletedCount = 0;
+    for (QListWidgetItem *item : selectedItems) {
+        const QString fileName = item->data(Qt::UserRole).toString();
+        if (dir.remove(fileName)) {
+            ++deletedCount;
+            delete item;
         }
-
-        QMessageBox::information(nullptr, "删除成功", QString("成功删除 %1 条聊天记录").arg(deletedCount));
-        emit cacheCleared();
     }
+
+    QMessageBox::information(nullptr, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条聊天记录。").arg(deletedCount));
+    emit cacheCleared();
 }
 
 void SettingsWidget::onSelectAllMedicalClicked()
@@ -417,57 +400,43 @@ void SettingsWidget::onSelectAllMedicalClicked()
 
 void SettingsWidget::onDeleteMedicalClicked()
 {
-    QList<QListWidgetItem*> selectedItems = ui->medicalRecordList->selectedItems();
+    const QList<QListWidgetItem*> selectedItems = ui->medicalRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(nullptr, "提示", "请先选择要删除的病例记录");
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先选择要删除的病例记录。"));
         return;
     }
 
-    int ret = QMessageBox::warning(nullptr, "确认删除", 
-        QString("确定要删除选中的 %1 条病例记录吗？此操作不可恢复！").arg(selectedItems.size()),
-        QMessageBox::Yes | QMessageBox::No);
-    
-    if (ret == QMessageBox::Yes) {
-        QString recordDir = QDir::homePath() + "/SmartMedica/records";
-        QDir dir(recordDir);
-
-        int deletedCount = 0;
-        for (QListWidgetItem *item : selectedItems) {
-            QString fileName = item->data(Qt::UserRole).toString();
-            if (dir.remove(fileName)) {
-                deletedCount++;
-                delete item;
-            }
+    const QString recordDir = QDir::homePath() + "/SmartMedica/records";
+    QDir dir(recordDir);
+    int deletedCount = 0;
+    for (QListWidgetItem *item : selectedItems) {
+        const QString fileName = item->data(Qt::UserRole).toString();
+        if (dir.remove(fileName)) {
+            ++deletedCount;
+            delete item;
         }
-
-        QMessageBox::information(nullptr, "删除成功", QString("成功删除 %1 条病例记录").arg(deletedCount));
     }
+
+    QMessageBox::information(nullptr, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条病例记录。").arg(deletedCount));
 }
 
 void SettingsWidget::onVolumeSliderChanged(int value)
 {
     ui->volumeValueLabel->setText(QString::number(value) + "%");
-
-    double volume = value / 100.0;
     m_settings->setValue("speechVolume", value);
-
-    emit speechSettingsChanged(volume, ui->rateSlider->value() / 50.0 - 1.0);
+    emit speechSettingsChanged(value / 100.0, ui->rateSlider->value() / 50.0 - 1.0);
 }
 
 void SettingsWidget::onRateSliderChanged(int value)
 {
-    QString rateText;
+    QString rateText = QStringLiteral("中");
     if (value < 30) {
-        rateText = "慢";
-    } else if (value < 70) {
-        rateText = "中";
-    } else {
-        rateText = "快";
+        rateText = QStringLiteral("慢");
+    } else if (value >= 70) {
+        rateText = QStringLiteral("快");
     }
     ui->rateValueLabel->setText(rateText);
 
-    double rate = value / 50.0 - 1.0;
     m_settings->setValue("speechRate", value);
-
-    emit speechSettingsChanged(ui->volumeSlider->value() / 100.0, rate);
+    emit speechSettingsChanged(ui->volumeSlider->value() / 100.0, value / 50.0 - 1.0);
 }

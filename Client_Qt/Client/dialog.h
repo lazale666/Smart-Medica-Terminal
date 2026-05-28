@@ -14,6 +14,7 @@ class Dialog : public QDialog
 public:
     explicit Dialog(QWidget *parent = nullptr);
     ~Dialog();
+    void applyAppearance(const QString &bgColor, const QString &fontColor);
 
 public slots:
     void reConnectInfo(int);

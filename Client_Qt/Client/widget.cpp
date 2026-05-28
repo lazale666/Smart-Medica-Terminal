@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QFont>
 #include <QtEndian>
+#include "themehelpers.h"
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
@@ -104,6 +105,14 @@ void Widget::setServerInfo(const QString &ip, int port, bool autoConnect)
     }
 }
 
+void Widget::applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor)
+{
+    applyModeSettings(mode);
+    applyBgColor(bgColor);
+    applyFontColor(fontColor);
+    dia->applyAppearance(m_bgColor, m_fontColor);
+}
+
 void Widget::applyModeSettings(const QString &mode)
 {
     m_currentMode = mode;
@@ -175,9 +184,11 @@ void Widget::applyModeSettings(const QString &mode)
 
 void Widget::applyFontColor(const QString &color)
 {
-    m_fontColor = (color.compare("#000000", Qt::CaseInsensitive) == 0) ? "#D8F7FF" : color;
-    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 16px; padding: 12px; }").arg(m_fontColor));
-    ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.55); border-radius: 16px; padding: 8px 12px; }").arg(m_fontColor));
+    m_fontColor = color.isEmpty() ? ThemeHelpers::defaultFontColorForBg(m_bgColor) : color;
+    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
+    const QString inputBg = light ? "rgba(255, 255, 255, 0.94)" : "rgba(2, 9, 20, 0.86)";
+    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: %2; border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 16px; padding: 12px; }").arg(m_fontColor, inputBg));
+    ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; border: 1px solid rgba(0, 229, 255, 0.55); border-radius: 16px; padding: 8px 12px; }").arg(m_fontColor, inputBg));
     ui->userLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
     ui->chatTitleLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
     ui->voiceLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(m_fontColor));
@@ -185,9 +196,9 @@ void Widget::applyFontColor(const QString &color)
 
 void Widget::applyBgColor(const QString &color)
 {
-    m_bgColor = (color.compare("#ffffff", Qt::CaseInsensitive) == 0) ? "#07111F" : color;
+    m_bgColor = ThemeHelpers::normalizeBgColor(color);
     applyFontColor(m_fontColor);
-    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
+    if (!ThemeHelpers::isLightTheme(m_bgColor)) {
         setStyleSheet(R"(
             QWidget#Widget {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
@@ -210,7 +221,30 @@ void Widget::applyBgColor(const QString &color)
             }
         )");
     } else {
-        setStyleSheet(QString("QWidget#Widget { background-color: %1; }").arg(m_bgColor));
+        setStyleSheet(R"(
+            QWidget#Widget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F5FBFF, stop:0.55 #E9F6FF, stop:1 #DCEEFF);
+            }
+            QWidget#leftWidget {
+                background: rgba(255, 255, 255, 0.78);
+                border: 1px solid rgba(15, 39, 64, 0.14);
+                border-radius: 18px;
+            }
+            QLabel#historyTitle {
+                color: #0F2740;
+                font-weight: 700;
+            }
+            QListWidget#historyList {
+                background: rgba(255, 255, 255, 0.92);
+                border: 1px solid rgba(15, 39, 64, 0.14);
+                border-radius: 14px;
+                color: #0F2740;
+                padding: 8px;
+            }
+            QWidget#Widget QFrame#line {
+                color: rgba(15, 39, 64, 0.12);
+            }
+        )");
     }
 }
 
@@ -581,16 +615,19 @@ void Widget::onModeChanged(const QString &mode)
     applyModeSettings(mode);
     refreshHistoryList();
     emit modeChanged(mode);
+    emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
 }
 
 void Widget::onFontColorChanged(const QString &color)
 {
     applyFontColor(color);
+    emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
 }
 
 void Widget::onBgColorChanged(const QString &color)
 {
     applyBgColor(color);
+    emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
 }
 
 void Widget::onServerConfigChanged(const QString &ip, quint16 port, bool autoConnect)
@@ -682,10 +719,17 @@ void Widget::appendChatMessage(const QString &sender, const QString &message, bo
     const QString wrapperStyle = isSelf
         ? "margin: 12px 0 12px auto; max-width: 72%; text-align: right;"
         : "margin: 12px auto 12px 0; max-width: 72%; text-align: left;";
-    const QString nameColor = isSelf ? "#8BD9FF" : "#31FFB7";
+    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
+    const QString nameColor = isSelf ? (light ? "#0F78B7" : "#8BD9FF") : (light ? "#157A52" : "#31FFB7");
     const QString cardStyle = isSelf
-        ? "display:inline-block; background-color: rgba(0,229,255,0.18); border: 1px solid rgba(0,229,255,0.45); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;"
-        : "display:inline-block; background-color: rgba(49,255,183,0.14); border: 1px solid rgba(49,255,183,0.35); border-radius: 16px; padding: 12px 16px; color: #EAFBFF;";
+        ? QString("display:inline-block; background-color: %1; border: 1px solid %2; border-radius: 16px; padding: 12px 16px; color: %3;")
+              .arg(light ? "rgba(127,217,255,0.35)" : "rgba(0,229,255,0.18)",
+                   light ? "rgba(15,120,183,0.35)" : "rgba(0,229,255,0.45)",
+                   light ? "#0F2740" : "#EAFBFF")
+        : QString("display:inline-block; background-color: %1; border: 1px solid %2; border-radius: 16px; padding: 12px 16px; color: %3;")
+              .arg(light ? "rgba(196,240,214,0.65)" : "rgba(49,255,183,0.14)",
+                   light ? "rgba(21,122,82,0.28)" : "rgba(49,255,183,0.35)",
+                   light ? "#0F2740" : "#EAFBFF");
 
     ui->textBrowser->append(QString(
         "<div style=\"%1\">"
@@ -697,13 +741,17 @@ void Widget::appendChatMessage(const QString &sender, const QString &message, bo
 
 void Widget::appendSystemMessage(const QString &message)
 {
+    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
     ui->textBrowser->append(QString(
         "<div style=\"margin: 10px 0; text-align: center;\">"
         "<span style=\"display:inline-block; padding: 6px 14px; border-radius: 14px; "
-        "background: rgba(139,185,200,0.14); border: 1px solid rgba(139,185,200,0.28); "
-        "color: #8BB9C8; font-size: 12px;\">%1</span>"
+        "background: %1; border: 1px solid %2; "
+        "color: %3; font-size: 12px;\">%4</span>"
         "</div>")
-        .arg(message.toHtmlEscaped()));
+        .arg(light ? "rgba(15,39,64,0.08)" : "rgba(139,185,200,0.14)",
+             light ? "rgba(15,39,64,0.18)" : "rgba(139,185,200,0.28)",
+             light ? "#4C647A" : "#8BB9C8",
+             message.toHtmlEscaped()));
 }
 
 void Widget::appendHistorySeparator(bool isTop)

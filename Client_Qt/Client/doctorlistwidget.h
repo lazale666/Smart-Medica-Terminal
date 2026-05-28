@@ -28,6 +28,7 @@ class DoctorListWidget : public QWidget
 public:
     explicit DoctorListWidget(const QString &serverIP, int serverPort, const QString &username, QWidget *parent = nullptr);
     ~DoctorListWidget();
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
 
 signals:
@@ -47,6 +48,8 @@ private:
     int m_serverPort;
     QString m_username;
     QString m_currentMode;
+    QString m_bgColor;
+    QString m_fontColor;
     QTimer *refreshTimer;
     QByteArray m_buffer;
     QVector<DoctorListEntry> m_doctors;

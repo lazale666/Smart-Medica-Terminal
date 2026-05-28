@@ -18,6 +18,7 @@ public:
     ~MemberRechargeWidget();
 
     void setUsername(const QString &username);
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
 
 protected:
@@ -38,9 +39,14 @@ private:
     QString m_bgPath;
     QSize m_lockedSize;
     QString m_currentMode;
+    QString m_currentBgColor;
+    QString m_fontColor;
 
     void loadMemberStatus();
     void saveMemberStatus();
+    void updateTexts();
+    void updateCardStyle();
+    void updatePurchaseButtonStyle();
     void updateBackground();
 };
 

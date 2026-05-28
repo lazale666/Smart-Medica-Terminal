@@ -18,6 +18,7 @@ public:
 
     void setRecordData(const QString &diseaseName, const QString &diagnosisDate, const QString &treatment);
     void setReadOnly(bool readOnly);
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
 
 signals:
@@ -30,6 +31,8 @@ private:
     Ui::RecordDetailWidget *ui;
     QString m_fileName;
     QString m_currentMode;
+    QString m_bgColor;
+    QString m_fontColor;
     bool m_isNewRecord;
 };
 

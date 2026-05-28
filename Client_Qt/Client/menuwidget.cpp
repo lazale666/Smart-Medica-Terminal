@@ -1,10 +1,8 @@
-
 #include "menuwidget.h"
 #include "ui_menuwidget.h"
 #include "settingswidget.h"
-#include <QMessageBox>
-#include <QJsonDocument>
-#include <QJsonObject>
+#include "themehelpers.h"
+
 #include <QShowEvent>
 
 MenuWidget::MenuWidget(QWidget *parent) :
@@ -20,7 +18,7 @@ MenuWidget::MenuWidget(QWidget *parent) :
     ui->setupUi(this);
 
     m_settings = new QSettings("SmartMedica", "Client", this);
-    
+
     socket = new QTcpSocket(this);
     connect(socket, &QTcpSocket::connected, this, &MenuWidget::onSocketConnected);
     connect(socket, &QTcpSocket::disconnected, this, &MenuWidget::onSocketDisconnected);
@@ -45,7 +43,7 @@ MenuWidget::~MenuWidget()
 void MenuWidget::setUsername(const QString &username)
 {
     m_username = username;
-    ui->userLabel->setText("当前用户：" + username);
+    ui->userLabel->setText(QStringLiteral("当前用户：") + username);
 }
 
 QString MenuWidget::getUsername() const
@@ -66,6 +64,13 @@ void MenuWidget::disconnectFromServer()
     }
 }
 
+void MenuWidget::applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor)
+{
+    applyModeSettings(mode);
+    applyBgColor(bgColor);
+    applyFontColor(fontColor);
+}
+
 void MenuWidget::applyModeSettings(const QString &mode)
 {
     m_currentMode = mode;
@@ -76,22 +81,12 @@ void MenuWidget::applyModeSettings(const QString &mode)
     QFont buttonFont = ui->chatBtn->font();
     QFont smallButtonFont = ui->settingsBtn->font();
 
-    if (mode == "关怀模式") {
+    if (mode == QStringLiteral("关怀模式")) {
         titleFont.setPointSize(34);
         infoFont.setPointSize(16);
         statusFont.setPointSize(15);
         buttonFont.setPointSize(24);
         smallButtonFont.setPointSize(15);
-
-        ui->titleLabel->setFont(titleFont);
-        ui->userLabel->setFont(infoFont);
-        ui->statusLabel->setFont(statusFont);
-        ui->chatBtn->setFont(buttonFont);
-        ui->medicalRecordBtn->setFont(buttonFont);
-        ui->doctorChatBtn->setFont(buttonFont);
-        ui->memberRechargeBtn->setFont(buttonFont);
-        ui->settingsBtn->setFont(smallButtonFont);
-        ui->logoutBtn->setFont(smallButtonFont);
 
         ui->chatBtn->setMinimumHeight(132);
         ui->medicalRecordBtn->setMinimumHeight(132);
@@ -107,16 +102,6 @@ void MenuWidget::applyModeSettings(const QString &mode)
         buttonFont.setPointSize(20);
         smallButtonFont.setPointSize(12);
 
-        ui->titleLabel->setFont(titleFont);
-        ui->userLabel->setFont(infoFont);
-        ui->statusLabel->setFont(statusFont);
-        ui->chatBtn->setFont(buttonFont);
-        ui->medicalRecordBtn->setFont(buttonFont);
-        ui->doctorChatBtn->setFont(buttonFont);
-        ui->memberRechargeBtn->setFont(buttonFont);
-        ui->settingsBtn->setFont(smallButtonFont);
-        ui->logoutBtn->setFont(smallButtonFont);
-
         ui->chatBtn->setMinimumHeight(100);
         ui->medicalRecordBtn->setMinimumHeight(100);
         ui->doctorChatBtn->setMinimumHeight(100);
@@ -125,21 +110,52 @@ void MenuWidget::applyModeSettings(const QString &mode)
         ui->logoutBtn->setMinimumHeight(35);
         resize(800, 600);
     }
+
+    ui->titleLabel->setFont(titleFont);
+    ui->userLabel->setFont(infoFont);
+    ui->statusLabel->setFont(statusFont);
+    ui->chatBtn->setFont(buttonFont);
+    ui->medicalRecordBtn->setFont(buttonFont);
+    ui->doctorChatBtn->setFont(buttonFont);
+    ui->memberRechargeBtn->setFont(buttonFont);
+    ui->settingsBtn->setFont(smallButtonFont);
+    ui->logoutBtn->setFont(smallButtonFont);
 }
 
 void MenuWidget::applyFontColor(const QString &color)
 {
-    m_fontColor = color;
+    m_fontColor = color.isEmpty() ? ThemeHelpers::defaultFontColorForBg(m_bgColor) : color;
     ui->userLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
-    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) != 0) {
-        ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(m_fontColor));
-    }
 }
 
 void MenuWidget::applyBgColor(const QString &color)
 {
-    m_bgColor = color;
-    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
+    m_bgColor = ThemeHelpers::normalizeBgColor(color);
+    if (ThemeHelpers::isLightTheme(m_bgColor)) {
+        setStyleSheet(R"(
+            QWidget#MenuWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F5FBFF, stop:0.55 #E9F6FF, stop:1 #DCEEFF);
+            }
+            QLabel#titleLabel {
+                color: #0F2740;
+                font: 700 30px "Microsoft YaHei";
+            }
+            QLabel#statusLabel, QLabel#userLabel {
+                color: #0F2740;
+            }
+            QPushButton#chatBtn, QPushButton#medicalRecordBtn, QPushButton#doctorChatBtn, QPushButton#memberRechargeBtn {
+                background: rgba(255, 255, 255, 0.9);
+                border: 1px solid rgba(15, 39, 64, 0.18);
+                border-radius: 22px;
+                color: #0F2740;
+                font: 700 20px "Microsoft YaHei";
+                min-height: 94px;
+            }
+            QPushButton#chatBtn:hover, QPushButton#medicalRecordBtn:hover, QPushButton#doctorChatBtn:hover, QPushButton#memberRechargeBtn:hover {
+                background: rgba(199, 244, 255, 0.95);
+            }
+        )");
+    } else {
         setStyleSheet(R"(
             QWidget#MenuWidget {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
@@ -164,31 +180,8 @@ void MenuWidget::applyBgColor(const QString &color)
                 border-color: #00E5FF;
             }
         )");
-    } else {
-        setStyleSheet(R"(
-            QWidget#MenuWidget {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F5FBFF, stop:0.55 #E9F6FF, stop:1 #DCEEFF);
-            }
-            QLabel#titleLabel {
-                color: #0F2740;
-                font: 700 30px "Microsoft YaHei";
-            }
-            QLabel#statusLabel, QLabel#userLabel {
-                color: #0F2740;
-            }
-            QPushButton#chatBtn, QPushButton#medicalRecordBtn, QPushButton#doctorChatBtn, QPushButton#memberRechargeBtn {
-                background: rgba(255, 255, 255, 0.9);
-                border: 1px solid rgba(15, 39, 64, 0.18);
-                border-radius: 22px;
-                color: #0F2740;
-                font: 700 20px "Microsoft YaHei";
-                min-height: 94px;
-            }
-            QPushButton#chatBtn:hover, QPushButton#medicalRecordBtn:hover, QPushButton#doctorChatBtn:hover, QPushButton#memberRechargeBtn:hover {
-                background: rgba(199, 244, 255, 0.95);
-            }
-        )");
     }
+    updateConnectionStatus();
 }
 
 void MenuWidget::onChatBtnClicked()
@@ -206,34 +199,37 @@ void MenuWidget::onSettingsBtnClicked()
     SettingsWidget *settings = new SettingsWidget();
     settings->setAttribute(Qt::WA_DeleteOnClose);
     settings->setCurrentMode(m_currentMode);
-    settings->setFontColor(m_fontColor);
     settings->setBgColor(m_bgColor);
-    
-    QObject::connect(settings, &SettingsWidget::logout, [=]() {
+    settings->setFontColor(m_fontColor);
+
+    connect(settings, &SettingsWidget::logout, [=]() {
         settings->close();
         disconnectFromServer();
         emit logout();
     });
-    
-    QObject::connect(settings, &SettingsWidget::serverConfigChanged, [=](const QString &ip, quint16 port, bool autoConnect) {
+
+    connect(settings, &SettingsWidget::serverConfigChanged, [=](const QString &ip, quint16 port, bool autoConnect) {
         m_serverIP = ip;
         m_serverPort = port;
         m_autoConnect = autoConnect;
     });
-    
-    QObject::connect(settings, &SettingsWidget::fontColorChanged, [=](const QString &color) {
+
+    connect(settings, &SettingsWidget::fontColorChanged, [=](const QString &color) {
         applyFontColor(color);
-    });
-    
-    QObject::connect(settings, &SettingsWidget::bgColorChanged, [=](const QString &color) {
-        applyBgColor(color);
+        emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
     });
 
-    QObject::connect(settings, &SettingsWidget::modeChanged, [=](const QString &mode) {
-        applyModeSettings(mode);
-        emit this->modeChanged(mode);
+    connect(settings, &SettingsWidget::bgColorChanged, [=](const QString &color) {
+        applyBgColor(color);
+        emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
     });
-    
+
+    connect(settings, &SettingsWidget::modeChanged, [=](const QString &mode) {
+        applyModeSettings(mode);
+        emit modeChanged(mode);
+        emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
+    });
+
     settings->show();
     settings->raise();
     settings->activateWindow();
@@ -259,6 +255,7 @@ void MenuWidget::onSocketDisconnected()
 
 void MenuWidget::onSocketError(QAbstractSocket::SocketError error)
 {
+    Q_UNUSED(error);
     updateConnectionStatus();
 }
 
@@ -267,12 +264,10 @@ void MenuWidget::loadSettings()
     m_serverIP = m_settings->value("serverIP", "127.0.0.1").toString();
     m_serverPort = m_settings->value("serverPort", 9999).toInt();
     m_autoConnect = m_settings->value("autoConnect", true).toBool();
-    m_fontColor = m_settings->value("fontColor", "#D8F7FF").toString();
-    m_bgColor = m_settings->value("bgColor", "#07111F").toString();
+    m_bgColor = ThemeHelpers::normalizeBgColor(m_settings->value("bgColor", "#07111F").toString());
+    m_fontColor = m_settings->value("fontColor", ThemeHelpers::defaultFontColorForBg(m_bgColor)).toString();
     m_currentMode = m_settings->value("mode", "普通模式").toString();
-    applyFontColor(m_fontColor);
-    applyBgColor(m_bgColor);
-    applyModeSettings(m_currentMode);
+    applyAppearance(m_currentMode, m_bgColor, m_fontColor);
 }
 
 void MenuWidget::saveSettings()
@@ -284,15 +279,19 @@ void MenuWidget::saveSettings()
 
 void MenuWidget::updateConnectionStatus()
 {
+    const QString ok = ThemeHelpers::statusOkColor(m_bgColor);
+    const QString warn = ThemeHelpers::statusWarnColor(m_bgColor);
+    const QString err = ThemeHelpers::statusErrorColor(m_bgColor);
+
     if (socket->state() == QTcpSocket::ConnectedState) {
-        ui->statusLabel->setText("服务器状态：已连接");
-        ui->statusLabel->setStyleSheet("color: #31FFB7; font-weight: bold;");
+        ui->statusLabel->setText(QStringLiteral("服务器状态：已连接"));
+        ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(ok));
     } else if (socket->state() == QTcpSocket::ConnectingState) {
-        ui->statusLabel->setText("服务器状态：连接中...");
-        ui->statusLabel->setStyleSheet("color: #FFCF5A; font-weight: bold;");
+        ui->statusLabel->setText(QStringLiteral("服务器状态：连接中..."));
+        ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(warn));
     } else {
-        ui->statusLabel->setText("服务器状态：未连接");
-        ui->statusLabel->setStyleSheet("color: #FF5F7E; font-weight: bold;");
+        ui->statusLabel->setText(QStringLiteral("服务器状态：未连接"));
+        ui->statusLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(err));
     }
 }
 

@@ -21,6 +21,7 @@ public:
     QString getUsername() const;
     void setServerInfo(const QString &ip, int port);
     void disconnectFromServer();
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
     void applyFontColor(const QString &color);
     void applyBgColor(const QString &color);
@@ -31,6 +32,7 @@ signals:
     void openDoctorChat(const QString &serverIP, int serverPort);
     void openMemberRecharge();
     void modeChanged(const QString &mode);
+    void appearanceChanged(const QString &mode, const QString &bgColor, const QString &fontColor);
     void logout();
 
 private slots:

@@ -22,6 +22,7 @@ public:
 
     void setServerInfo(const QString &ip, int port);
     void setUsername(const QString &username);
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
     void applyFontColor(const QString &color);
     void applyBgColor(const QString &color);
@@ -30,6 +31,7 @@ signals:
     void backToMenu();
     void logout();
     void modeChanged(const QString &mode);
+    void appearanceChanged(const QString &mode, const QString &bgColor, const QString &fontColor);
 
 private slots:
     void onAiFillBtnClicked();

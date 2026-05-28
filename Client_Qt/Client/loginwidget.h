@@ -17,6 +17,7 @@ class LoginWidget : public QWidget
 public:
     explicit LoginWidget(QWidget *parent = nullptr);
     ~LoginWidget();
+    void applyAppearance(const QString &bgColor, const QString &fontColor);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -38,6 +39,8 @@ private:
 
     QJsonObject users;
     QString m_bgPath;
+    QString m_bgColor;
+    QString m_fontColor;
 };
 
 #endif // LOGINWIDGET_H

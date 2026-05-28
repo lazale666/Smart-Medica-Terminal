@@ -17,6 +17,7 @@ class DoctorDialog : public QDialog
 public:
     explicit DoctorDialog(QTcpSocket *socket, const QString &username, const QString &doctorName, QWidget *parent = nullptr);
     ~DoctorDialog();
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
 
 private slots:
@@ -30,6 +31,8 @@ private:
     QString m_username;
     QString m_doctorName;
     QString m_currentMode;
+    QString m_bgColor;
+    QString m_fontColor;
     QByteArray m_buffer;
 
     void sendMessage(const QString &message);

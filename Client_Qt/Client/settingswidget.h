@@ -64,6 +64,7 @@ private:
     void saveSettings();
     void loadChatRecords();
     void loadMedicalRecords();
+    void updateTheme();
     void deleteSelectedChatRecords();
     void deleteSelectedMedicalRecords();
 };

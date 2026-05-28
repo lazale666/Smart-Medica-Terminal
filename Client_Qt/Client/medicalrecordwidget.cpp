@@ -11,6 +11,7 @@
 #include <QDataStream>
 #include <QFileInfo>
 #include <QStringConverter>
+#include "themehelpers.h"
 
 MedicalRecordWidget::MedicalRecordWidget(QWidget *parent) :
     QWidget(parent),
@@ -70,6 +71,16 @@ void MedicalRecordWidget::setServerInfo(const QString &ip, int port)
 void MedicalRecordWidget::setUsername(const QString &username)
 {
     m_username = username;
+}
+
+void MedicalRecordWidget::applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor)
+{
+    applyModeSettings(mode);
+    applyBgColor(bgColor);
+    applyFontColor(fontColor);
+    if (m_detailWidget) {
+        m_detailWidget->applyAppearance(mode, m_bgColor, m_fontColor);
+    }
 }
 
 void MedicalRecordWidget::applyModeSettings(const QString &mode)
@@ -134,20 +145,28 @@ void MedicalRecordWidget::applyModeSettings(const QString &mode)
 
 void MedicalRecordWidget::applyFontColor(const QString &color)
 {
-    m_fontColor = (color.compare("#000000", Qt::CaseInsensitive) == 0) ? "#D8F7FF" : color;
-    ui->diseaseEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor));
-    ui->treatmentEdit->setStyleSheet(QString("QTextEdit { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor));
-    ui->recordList->setStyleSheet(QString("QListWidget { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor));
+    m_fontColor = color.isEmpty() ? ThemeHelpers::defaultFontColorForBg(m_bgColor) : color;
+    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
+    const QString inputBg = light ? "rgba(255, 255, 255, 0.94)" : "rgba(2, 9, 20, 0.86)";
+    ui->diseaseEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor, inputBg));
+    ui->treatmentEdit->setStyleSheet(QString("QTextEdit { color: %1; background-color: %2; border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor, inputBg));
+    ui->recordList->setStyleSheet(QString("QListWidget { color: %1; background-color: %2; border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor, inputBg));
+    ui->statusLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(light ? "#4C647A" : "#D8F7FF"));
 }
 
 void MedicalRecordWidget::applyBgColor(const QString &color)
 {
-    m_bgColor = color;
+    m_bgColor = ThemeHelpers::normalizeBgColor(color);
     applyFontColor(m_fontColor);
-    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
+    if (!ThemeHelpers::isLightTheme(m_bgColor)) {
         setStyleSheet(R"(
             QWidget#MedicalRecordWidget {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+            }
+            QWidget#leftWidget {
+                background: rgba(4, 15, 31, 0.76);
+                border: 1px solid rgba(0, 229, 255, 0.28);
+                border-radius: 18px;
             }
             QLabel#titleLabel, QLabel#recordListLabel {
                 color: #00E5FF;
@@ -158,6 +177,11 @@ void MedicalRecordWidget::applyBgColor(const QString &color)
         setStyleSheet(R"(
             QWidget#MedicalRecordWidget {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F5FBFF, stop:0.55 #E9F6FF, stop:1 #DCEEFF);
+            }
+            QWidget#leftWidget {
+                background: rgba(255, 255, 255, 0.78);
+                border: 1px solid rgba(15, 39, 64, 0.14);
+                border-radius: 18px;
             }
             QLabel#titleLabel, QLabel#recordListLabel {
                 color: #0F2740;
@@ -213,20 +237,23 @@ void MedicalRecordWidget::onLogoutFromSettings()
 void MedicalRecordWidget::onFontColorChanged(const QString &color)
 {
     applyFontColor(color);
+    emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
 }
 
 void MedicalRecordWidget::onModeChanged(const QString &mode)
 {
     applyModeSettings(mode);
     if (m_detailWidget) {
-        m_detailWidget->applyModeSettings(mode);
+        m_detailWidget->applyAppearance(mode, m_bgColor, m_fontColor);
     }
     emit modeChanged(mode);
+    emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
 }
 
 void MedicalRecordWidget::onBgColorChanged(const QString &color)
 {
     applyBgColor(color);
+    emit appearanceChanged(m_currentMode, m_bgColor, m_fontColor);
 }
 
 void MedicalRecordWidget::onAiFillBtnClicked()
@@ -315,7 +342,7 @@ void MedicalRecordWidget::onRecordListClicked(QListWidgetItem *item)
             m_detailWidget->setAttribute(Qt::WA_DeleteOnClose);
             m_detailWidget->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
             m_detailWidget->setRecordData(diseaseName, diagnosisDate, treatment);
-            m_detailWidget->applyModeSettings(m_currentMode);
+            m_detailWidget->applyAppearance(m_currentMode, m_bgColor, m_fontColor);
 
             connect(m_detailWidget, &QWidget::destroyed, this, [=]() {
                 m_detailWidget = nullptr;

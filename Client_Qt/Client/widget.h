@@ -31,6 +31,7 @@ public:
 
     void setUsername(const QString &username);
     void setServerInfo(const QString &ip, int port, bool autoConnect);
+    void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
     void applyFontColor(const QString &color);
     void applyBgColor(const QString &color);
@@ -64,6 +65,7 @@ signals:
     void logout();
     void sendInfo(int count);
     void modeChanged(const QString &mode);
+    void appearanceChanged(const QString &mode, const QString &bgColor, const QString &fontColor);
 
 private:
     void loadSettings();

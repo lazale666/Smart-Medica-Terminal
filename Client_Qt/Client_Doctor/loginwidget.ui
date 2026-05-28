@@ -6,25 +6,43 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>1017</width>
+    <height>398</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>茯苓 - 医疗智能体</string>
+   <string>医生登录 - 医疗智能体</string>
   </property>
-  <layout class="QVBoxLayout">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>18</number>
+   </property>
+   <property name="leftMargin">
+    <number>60</number>
+   </property>
+   <property name="topMargin">
+    <number>42</number>
+   </property>
+   <property name="rightMargin">
+    <number>60</number>
+   </property>
+   <property name="bottomMargin">
+    <number>42</number>
+   </property>
    <item>
     <widget class="QLabel" name="titleLabel">
      <property name="text">
-      <string>茯苓</string>
+      <string>医生工作站</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignCenter</set>
      </property>
     </widget>
    </item>
    <item>
     <widget class="QLineEdit" name="usernameEdit">
      <property name="placeholderText">
-      <string>用户名</string>
+      <string>请输入医生账号</string>
      </property>
     </widget>
    </item>
@@ -34,12 +52,15 @@
       <enum>QLineEdit::Password</enum>
      </property>
      <property name="placeholderText">
-      <string>密码</string>
+      <string>请输入登录密码</string>
      </property>
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout">
+    <layout class="QHBoxLayout" name="buttonLayout">
+     <property name="spacing">
+      <number>18</number>
+     </property>
      <item>
       <widget class="QPushButton" name="loginBtn">
        <property name="text">

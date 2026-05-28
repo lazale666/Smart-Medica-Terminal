@@ -14,10 +14,27 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     , ui(new Ui::SettingsWidget)
 {
     ui->setupUi(this);
+    setMinimumSize(720, 520);
+    setStyleSheet(R"(
+        QWidget#SettingsWidget {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+        }
+        QStackedWidget, QWidget#userInfoPage, QWidget#modePage, QWidget#cachePage, QWidget#serverPage {
+            background: transparent;
+        }
+        QLabel {
+            color: #D8F7FF;
+            font-family: "Microsoft YaHei";
+        }
+        QLabel#usernameLabel, QLabel#cacheLabel, QLabel#serverLabel {
+            color: #00E5FF;
+            font-weight: 700;
+        }
+    )");
 
     m_settings = new QSettings("SmartMedica", "Client", this);
-    m_currentColor = "#000000";
-    m_currentBgColor = "#ffffff";
+    m_currentColor = "#D8F7FF";
+    m_currentBgColor = "#07111F";
 
     connect(ui->navUserInfoBtn, &QPushButton::clicked, this, &SettingsWidget::onNavUserInfoClicked);
     connect(ui->navModeBtn, &QPushButton::clicked, this, &SettingsWidget::onNavModeClicked);
@@ -115,8 +132,8 @@ void SettingsWidget::switchToPage(int pageIndex)
 void SettingsWidget::loadSettings()
 {
     QString mode = m_settings->value("mode", "普通模式").toString();
-    QString color = m_settings->value("fontColor", "#000000").toString();
-    QString bgColor = m_settings->value("bgColor", "#ffffff").toString();
+    QString color = m_settings->value("fontColor", "#D8F7FF").toString();
+    QString bgColor = m_settings->value("bgColor", "#07111F").toString();
     QString ip = m_settings->value("serverIP", "127.0.0.1").toString();
     quint16 port = m_settings->value("serverPort", 9999).toUInt();
     bool autoConnect = m_settings->value("autoConnect", true).toBool();
@@ -162,7 +179,7 @@ void SettingsWidget::onSaveUserInfoBtnClicked()
     m_settings->setValue("age", age);
     m_settings->sync();
 
-    QMessageBox::information(this, "提示", "用户信息已保存！");
+    QMessageBox::information(nullptr, "提示", "用户信息已保存！");
 }
 
 void SettingsWidget::loadChatRecords()
@@ -266,7 +283,7 @@ void SettingsWidget::onSaveServerBtnClicked()
     quint16 port = ui->portEdit->text().toUInt();
     bool autoConnect = ui->autoConnectCheck->isChecked();
     emit serverConfigChanged(ip, port, autoConnect);
-    QMessageBox::information(this, "提示", "服务器配置已保存");
+    QMessageBox::information(nullptr, "提示", "服务器配置已保存");
 }
 
 void SettingsWidget::onCloseBtnClicked()
@@ -277,7 +294,7 @@ void SettingsWidget::onCloseBtnClicked()
 
 void SettingsWidget::onLogoutBtnClicked()
 {
-    int ret = QMessageBox::question(this, "确认退出", "确定要退出登录吗？",
+    int ret = QMessageBox::question(nullptr, "确认退出", "确定要退出登录吗？",
                                     QMessageBox::Yes | QMessageBox::No);
     if (ret == QMessageBox::Yes) {
         saveSettings();
@@ -294,8 +311,8 @@ void SettingsWidget::onModeChanged(int index)
         ui->bgColorLabel->setVisible(false);
         ui->bgColorBtn->setVisible(false);
         ui->colorPreview->setVisible(false);
-        m_currentColor = "#000000";
-        m_currentBgColor = "#ffffff";
+        m_currentColor = "#D8F7FF";
+        m_currentBgColor = "#07111F";
         saveSettings();
         emit fontColorChanged(m_currentColor);
         emit bgColorChanged(m_currentBgColor);
@@ -349,11 +366,11 @@ void SettingsWidget::onDeleteChatClicked()
 {
     QList<QListWidgetItem*> selectedItems = ui->chatRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请先选择要删除的聊天记录");
+        QMessageBox::warning(nullptr, "提示", "请先选择要删除的聊天记录");
         return;
     }
 
-    int ret = QMessageBox::warning(this, "确认删除", 
+    int ret = QMessageBox::warning(nullptr, "确认删除", 
         QString("确定要删除选中的 %1 条聊天记录吗？此操作不可恢复！").arg(selectedItems.size()),
         QMessageBox::Yes | QMessageBox::No);
     
@@ -371,7 +388,7 @@ void SettingsWidget::onDeleteChatClicked()
             }
         }
 
-        QMessageBox::information(this, "删除成功", QString("成功删除 %1 条聊天记录").arg(deletedCount));
+        QMessageBox::information(nullptr, "删除成功", QString("成功删除 %1 条聊天记录").arg(deletedCount));
         emit cacheCleared();
     }
 }
@@ -387,11 +404,11 @@ void SettingsWidget::onDeleteMedicalClicked()
 {
     QList<QListWidgetItem*> selectedItems = ui->medicalRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请先选择要删除的病例记录");
+        QMessageBox::warning(nullptr, "提示", "请先选择要删除的病例记录");
         return;
     }
 
-    int ret = QMessageBox::warning(this, "确认删除", 
+    int ret = QMessageBox::warning(nullptr, "确认删除", 
         QString("确定要删除选中的 %1 条病例记录吗？此操作不可恢复！").arg(selectedItems.size()),
         QMessageBox::Yes | QMessageBox::No);
     
@@ -408,7 +425,7 @@ void SettingsWidget::onDeleteMedicalClicked()
             }
         }
 
-        QMessageBox::information(this, "删除成功", QString("成功删除 %1 条病例记录").arg(deletedCount));
+        QMessageBox::information(nullptr, "删除成功", QString("成功删除 %1 条病例记录").arg(deletedCount));
     }
 }
 

@@ -1,5 +1,9 @@
 #include "doctorchatwidget.h"
 #include "ui_doctorchatwidget.h"
+#include <QSettings>
+#include <QPushButton>
+#include <QSizePolicy>
+#include <QtEndian>
 
 DoctorChatWidget::DoctorChatWidget(QWidget *parent)
     : QWidget(parent)
@@ -7,8 +11,10 @@ DoctorChatWidget::DoctorChatWidget(QWidget *parent)
     , m_externalSocket(false)
 {
     ui->setupUi(this);
+    setMinimumSize(900, 650);
     socket = new QTcpSocket(this);
     historyDialog = new HistoryDialog(this);
+    settingsWidget = new SettingsWidget_Doc();
     initConnections();
     connectToServer();
 }
@@ -20,41 +26,148 @@ DoctorChatWidget::DoctorChatWidget(QTcpSocket *existingSocket, QWidget *parent)
     , m_externalSocket(true)
 {
     ui->setupUi(this);
+    setMinimumSize(900, 650);
+    if (socket) {
+        socket->setParent(this);
+    }
     historyDialog = new HistoryDialog(this);
+    settingsWidget = new SettingsWidget_Doc();
     initConnections();
     
     if (socket->state() == QTcpSocket::ConnectedState) {
         ui->statusLabel->setText("状态：已连接");
-        ui->statusLabel->setStyleSheet("color: #4CAF50; font-size: 14px;");
+        ui->statusLabel->setStyleSheet("color: #31ffb7; font-size: 14px; font-weight: 700;");
     }
+}
+
+void DoctorChatWidget::setUsername(const QString &username)
+{
+    m_username = username;
+    settingsWidget->setUsername(username);
 }
 
 void DoctorChatWidget::initConnections()
 {
+    setStyleSheet(R"(
+        QWidget#DoctorChatWidget {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111f, stop:0.55 #071b2f, stop:1 #0b1023);
+        }
+        QWidget#headerWidget, QWidget#inputWidget {
+            background: rgba(4, 15, 31, 0.82);
+            border: 1px solid rgba(0, 229, 255, 0.35);
+            border-radius: 18px;
+        }
+        QLabel {
+            color: #d8f7ff;
+            font-family: "Microsoft YaHei";
+        }
+        QLabel#titleLabel {
+            color: #00e5ff;
+            font: 700 24px "Microsoft YaHei";
+        }
+        QTextBrowser {
+            background: rgba(2, 9, 20, 0.86);
+            border: 1px solid rgba(0, 229, 255, 0.35);
+            border-radius: 18px;
+            color: #eafbff;
+            padding: 18px;
+            font: 14px "Microsoft YaHei";
+        }
+        QLineEdit {
+            background: rgba(2, 9, 20, 0.86);
+            border: 1px solid rgba(0, 229, 255, 0.55);
+            border-radius: 18px;
+            color: #eafbff;
+            padding: 10px 16px;
+            font: 14px "Microsoft YaHei";
+        }
+        QLineEdit:focus {
+            border: 2px solid #00e5ff;
+        }
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00e5ff, stop:1 #31ffb7);
+            border: 1px solid rgba(234, 251, 255, 0.65);
+            border-radius: 16px;
+            color: #03111d;
+            padding: 8px 18px;
+            font: 700 14px "Microsoft YaHei";
+        }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #31ffb7, stop:1 #00e5ff);
+        }
+        QPushButton#historyBtn {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffcf5a, stop:1 #ff7a59);
+        }
+        QPushButton#settingsBtn {
+            background: rgba(6, 24, 45, 0.92);
+            color: #d8f7ff;
+            border: 1px solid rgba(0, 229, 255, 0.75);
+        }
+    )");
+    ui->headerWidget->setStyleSheet("background: rgba(4, 15, 31, 0.82); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 18px;");
+    ui->inputWidget->setStyleSheet("background: rgba(4, 15, 31, 0.82); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 18px;");
+    ui->textBrowser->setStyleSheet("QTextBrowser { background: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 18px; color: #EAFBFF; padding: 18px; font: 14px \"Microsoft YaHei\"; }");
+    ui->textBrowser->setHtml("<html><body style='font-family:Microsoft YaHei; font-size:14px; color:#EAFBFF; background-color:#020914; padding:20px;'>"
+                             "<p align='center' style='margin-top:40px;'><span style='color:#00E5FF; font-size:22px; font-weight:700;'>欢迎进入医生咨询中心</span></p>"
+                             "<p align='center' style='margin-top:15px;'><span style='color:#D8F7FF; font-size:14px;'>您将实时接收用户的健康咨询消息</span></p>"
+                             "<p align='center' style='margin-top:20px;'><span style='color:#8BB9C8; font-size:12px;'>等待消息中...</span></p>"
+                             "</body></html>");
+    ui->titleLabel->setText("医生咨询中心");
+    ui->historyBtn->setText("历史记录");
+    ui->settingsBtn->setText("设置");
+    ui->sendBtn->setText("发送回复");
+    ui->lineEdit->setPlaceholderText("输入回复消息...");
+    ui->historyBtn->setMinimumSize(128, 42);
+    ui->settingsBtn->setMinimumSize(96, 42);
+    ui->sendBtn->setMinimumSize(112, 42);
+    ui->historyBtn->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #FFCF5A, stop:1 #FF7A59); color: #03111D; border: 1px solid rgba(234, 251, 255, 0.75); border-radius: 16px; padding: 8px 18px; font: 700 14px \"Microsoft YaHei\"; min-width: 128px; min-height: 42px; } QPushButton:hover { background: #FFCF5A; }");
+    ui->settingsBtn->setStyleSheet("QPushButton { background: rgba(6, 24, 45, 0.92); color: #D8F7FF; border: 1px solid rgba(0, 229, 255, 0.75); border-radius: 16px; padding: 8px 18px; font: 700 14px \"Microsoft YaHei\"; min-width: 96px; min-height: 42px; } QPushButton:hover { background: rgba(0, 229, 255, 0.18); }");
+    ui->historyBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    ui->settingsBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    ui->sendBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    ui->headerWidget->setMinimumHeight(112);
+
     connect(socket, &QTcpSocket::connected, this, [=]() {
         ui->statusLabel->setText("状态：已连接");
-        ui->statusLabel->setStyleSheet("color: #4CAF50; font-size: 14px;");
+        ui->statusLabel->setStyleSheet("color: #31ffb7; font-size: 14px; font-weight: 700;");
     });
     connect(socket, &QTcpSocket::disconnected, this, [=]() {
         ui->statusLabel->setText("状态：已断开");
-        ui->statusLabel->setStyleSheet("color: #f44336; font-size: 14px;");
+        ui->statusLabel->setStyleSheet("color: #ff5f7e; font-size: 14px; font-weight: 700;");
     });
     connect(socket, &QTcpSocket::readyRead, this, &DoctorChatWidget::readData);
     connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QTcpSocket::errorOccurred),
             this, [=](QAbstractSocket::SocketError) {
         ui->statusLabel->setText("状态：连接失败");
-        ui->statusLabel->setStyleSheet("color: #f44336; font-size: 14px;");
+        ui->statusLabel->setStyleSheet("color: #ff5f7e; font-size: 14px; font-weight: 700;");
+    });
+    
+    connect(ui->settingsBtn, &QPushButton::clicked, this, &DoctorChatWidget::on_settingsBtn_clicked);
+    connect(ui->historyBtn, &QPushButton::clicked, this, &DoctorChatWidget::on_historyBtn_clicked);
+    connect(ui->sendBtn, &QPushButton::clicked, this, &DoctorChatWidget::on_sendBtn_clicked);
+    
+    connect(settingsWidget, &SettingsWidget_Doc::logout, this, [=]() {
+        this->close();
     });
 }
 
 DoctorChatWidget::~DoctorChatWidget()
 {
+    if (settingsWidget) {
+        settingsWidget->close();
+        delete settingsWidget;
+        settingsWidget = nullptr;
+    }
     delete ui;
 }
 
 void DoctorChatWidget::connectToServer()
 {
-    socket->connectToHost("127.0.0.1", 9999);
+    QSettings settings("SmartMedica", "DoctorClient");
+    QString ip = settings.value("serverIP", "127.0.0.1").toString();
+    quint16 port = settings.value("serverPort", 9999).toUInt();
+    
+    socket->connectToHost(ip, port);
 }
 
 void DoctorChatWidget::sendMessage(const QString &message)
@@ -66,52 +179,49 @@ void DoctorChatWidget::sendMessage(const QString &message)
 
     QJsonDocument doc(obj);
     QByteArray data = doc.toJson(QJsonDocument::Compact);
-    quint32 len = data.size();
+    quint32 len = qToBigEndian<quint32>(static_cast<quint32>(data.size()));
     QByteArray sendData;
-    sendData.append((char*)&len, sizeof(quint32));
+    sendData.append(reinterpret_cast<const char*>(&len), sizeof(quint32));
     sendData.append(data);
 
     socket->write(sendData);
+    socket->flush();
 }
 
 void DoctorChatWidget::readData()
 {
-    QByteArray buffer;
-    while (socket->bytesAvailable() > 0) {
-        buffer += socket->readAll();
-    }
+    m_buffer.append(socket->readAll());
 
-    while (buffer.size() >= 4) {
-        quint32 dataLen;
-        memcpy(&dataLen, buffer.constData(), sizeof(quint32));
-        dataLen = qFromBigEndian(dataLen);
+    while (m_buffer.size() >= 4) {
+        quint32 dataLen = qFromBigEndian<quint32>(reinterpret_cast<const uchar*>(m_buffer.constData()));
 
-        if (buffer.size() < 4 + dataLen) {
+        if (m_buffer.size() < static_cast<int>(4 + dataLen)) {
             break;
         }
 
-        QByteArray jsonData = buffer.mid(4, dataLen);
-        buffer = buffer.mid(4 + dataLen);
+        QByteArray jsonData = m_buffer.mid(4, dataLen);
+        m_buffer = m_buffer.mid(4 + dataLen);
 
         QJsonDocument doc = QJsonDocument::fromJson(jsonData);
         if (doc.isObject()) {
             QJsonObject obj = doc.object();
             QString type = obj.value("type").toString();
             QString sender = obj.value("sender").toString();
-
+            
             if (type == "login_success") {
                 QString name = obj.value("name").toString();
                 setWindowTitle("医生咨询中心 - " + name);
             } else if (type == "new_client") {
                 QString clientName = obj.value("client_name").toString();
-                ui->textBrowser->append(QString("<div style='color: #999; font-style: italic;'>用户 %1 已连接</div>").arg(clientName));
+                ui->textBrowser->append(QString("<div style=\"padding: 10px;\"><span style=\"color: #31ffb7; font-style: italic; font-size: 13px;\">用户 %1 已连接</span></div>").arg(clientName.toHtmlEscaped()));
             } else if (type == "client_message") {
                 QString message = obj.value("message").toString();
-                messageHistory.append(message);
-
-                QString formattedMsg = QString("<div style='background-color: #f1f8e9; color: #333; padding: 10px 16px; border-radius: 16px; margin: 10px 0; max-width: 70%; border: 1px solid #ddd;'>\n"
-                                              "<span style='font-weight: 500; color: #388e3c;'>%1：</span>%2\n"
-                                              "</div>").arg(sender).arg(message);
+                messageHistory.append(QString("%1：%2").arg(sender, message));
+                
+                QString formattedMsg = QString("<div style=\"background-color: rgba(49,255,183,0.14); color: #eafbff; padding: 12px 20px; border-radius: 16px; margin: 10px 0; max-width: 70%; border: 1px solid rgba(49,255,183,0.35);\">"
+                                              "<span style=\"font-weight: 600; color: #31ffb7; font-size: 13px;\">%1</span><br>"
+                                              "<span style=\"font-size: 15px; line-height: 1.6;\">%2</span>"
+                                              "</div>").arg(sender.toHtmlEscaped(), message.toHtmlEscaped());
                 ui->textBrowser->append(formattedMsg);
             }
         }
@@ -121,28 +231,39 @@ void DoctorChatWidget::readData()
 void DoctorChatWidget::on_sendBtn_clicked()
 {
     QString message = ui->lineEdit->text().trimmed();
-    if (message.isEmpty()) return;
-
-    QJsonObject obj;
-    obj["type"] = "message";
-    obj["message"] = message;
-    obj["sender"] = "doctor";
-
-    QString formattedMsg = QString("<div style='background-color: #00bcd4; color: white; padding: 10px 16px; border-radius: 16px; margin: 10px 0; max-width: 70%; text-align: right; margin-left: auto; border: 1px solid #0097a7;'>\n"
-                                  "<span style='font-weight: 500;'>我：</span>%1\n"
-                                  "</div>").arg(message);
-    ui->textBrowser->append(formattedMsg);
-
+    if (message.isEmpty()) {
+        return;
+    }
+    
     sendMessage(message);
+    messageHistory.append(QString("我：%1").arg(message));
+    
+    QString formattedMsg = QString("<div style=\"background-color: rgba(0,229,255,0.24); color: #eafbff; padding: 12px 20px; border-radius: 16px; margin: 10px 0; max-width: 70%; margin-left: auto; text-align: right; border: 1px solid rgba(0,229,255,0.55);\">"
+                                  "<span style=\"font-weight: 600; font-size: 13px;\">我</span><br>"
+                                  "<span style=\"font-size: 15px; line-height: 1.6;\">%1</span>"
+                                  "</div>").arg(message.toHtmlEscaped());
+    ui->textBrowser->append(formattedMsg);
     ui->lineEdit->clear();
 }
 
 void DoctorChatWidget::on_historyBtn_clicked()
 {
-    QJsonObject obj;
-    obj["type"] = "request_history";
-    socket->write(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    QJsonArray historyArray;
+    for (const QString &msg : messageHistory) {
+        historyArray.append(msg);
+    }
+    historyDialog->setHistoryData(historyArray);
+    historyDialog->show();
+}
+
+void DoctorChatWidget::on_settingsBtn_clicked()
+{
+    QSettings settings("SmartMedica", "DoctorClient");
+    QString ip = settings.value("serverIP", "127.0.0.1").toString();
+    quint16 port = settings.value("serverPort", 9999).toUInt();
+    settingsWidget->setServerConfig(ip, port);
     
-    historyDialog->setHistoryData(userHistory);
-    historyDialog->exec();
+    settingsWidget->show();
+    settingsWidget->raise();
+    settingsWidget->activateWindow();
 }

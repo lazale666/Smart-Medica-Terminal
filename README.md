@@ -1,33 +1,46 @@
-# 医疗智能体 AI Chat System
+# 医疗智能体系统 Smart-Medica Terminal
 
 ## 项目简介
 
-这是一个基于 Python 服务器和 Qt 客户端的 AI 聊天系统，集成了 Ollama AI 模型，提供语音输入输出功能。
+这是一个基于 Python 服务器和 Qt 客户端的医疗智能对话系统，集成了 Ollama AI 模型，提供语音输入输出功能，并支持名医在线咨询功能。
 
 ## 项目结构
 
 ```
-Project_End/
-├── Server/                              # Python 服务器端
-│   ├── server.py                        # 主服务器代码
-│   ├── requirements.txt                 # Python 依赖
-│   └── 启动服务器.bat                   # 一键启动脚本
+Smart-Medica-Terminal/
+├── Server_python/                        # Python 服务器端
+│   ├── server.py                         # 主服务器代码（含数据库和消息转发）
+│   ├── requirements.txt                  # Python 依赖
+│   └── smart_medica.db                   # SQLite 数据库文件（自动生成）
 │
-├── Client_Qt/Client/                    # Qt 客户端
-│   ├── main.cpp                         # 程序入口
-│   ├── loginwidget.h/cpp                # 登录界面
-│   ├── loginwidget.ui                   # 登录界面 UI
-│   ├── widget.h/cpp                     # 主聊天界面
-│   ├── widget.ui                        # 主聊天界面 UI
-│   ├── dialog.h/cpp                     # 重连对话框
-│   ├── dialog.ui                        # 重连对话框 UI
-│   ├── audio.h/cpp                      # 音频录制功能
-│   ├── mainwindow.h/cpp                 # 主窗口（预留）
-│   ├── mainwindow.ui                    # 主窗口 UI
-│   └── dontknow.pro                     # Qt 项目文件
+├── Client_Qt/
+│   ├── Client/                           # 普通用户客户端
+│   │   ├── main.cpp                      # 程序入口
+│   │   ├── loginwidget.h/cpp/ui          # 登录界面
+│   │   ├── menuwidget.h/cpp/ui           # 主菜单界面
+│   │   ├── widget.h/cpp/ui               # AI 聊天界面
+│   │   ├── medicalrecordwidget.h/cpp/ui  # 病历记录界面
+│   │   ├── doctorlistwidget.h/cpp/ui     # 名医列表界面
+│   │   ├── doctordialog.h/cpp/ui         # 名医对话窗口
+│   │   ├── memberwidget.h/cpp/ui         # 会员充值界面
+│   │   ├── recorddetailwidget.h/cpp/ui   # 病历详情窗口
+│   │   ├── historydialog.h/cpp/ui        # 聊天历史窗口
+│   │   ├── settingswidget.h/cpp/ui       # 设置界面
+│   │   ├── audio.h/cpp                   # 音频录制功能
+│   │   ├── speech.h/cpp                  # 语音合成功能
+│   │   ├── photo/face.png                # 人脸识别图片
+│   │   └── dontknow.pro                  # Qt 项目文件
+│   │
+│   └── Client_Doctor/                    # 医师客户端
+│       ├── main.cpp                      # 程序入口
+│       ├── loginwidget.h/cpp/ui          # 医生登录界面
+│       ├── doctorchatwidget.h/cpp/ui     # 医生聊天界面
+│       ├── settingswidget_doc.h/cpp/ui   # 医生设置界面
+│       ├── historydialog.h/cpp/ui        # 历史记录窗口
+│       └── medical.pro                   # Qt 项目文件
 │
-├── README.md                            # 本文档
-└── 配置说明_BAIDU_VOICE.md              # 百度语音 API 配置说明
+├── README.md                             # 本文档
+└── 配置说明_BAIDU_VOICE.md               # 百度语音 API 配置说明
 ```
 
 ## 功能特性
@@ -36,22 +49,36 @@ Project_End/
 
 - [x] TCP 服务器，支持多客户端连接
 - [x] 集成 Ollama AI 模型（默认使用 qwen2.5:7b）
+- [x] SQLite 数据库，存储用户和医生账号信息
+- [x] 名医在线状态管理
+- [x] 医患消息转发机制
 - [x] 实时日志输出，显示调试信息
 - [x] 自动检测和启动 Ollama 服务
 - [x] 兼容两种消息格式（`data` 和 `message`）
 
-### 客户端
+### 普通用户客户端
 
-- [x] 账号密码登录
-- [x] 用户注册功能
-- [x] 服务器连接界面
-- [x] 保存历史连接记录
-- [x] 支持新建、删除连接
-- [x] 自动重连机制（最多 10 次）
-- [x] AI 对话界面
-- [x] 对话内容实时保存和显示
-- [x] 语音输入功能
+- [x] 账号密码登录/注册
+- [x] 主菜单界面（田字形布局）
+- [x] AI 对话界面（问诊功能）
+- [x] 病历记录管理
+- [x] **名医对话功能**（跳过选择，直接连接）
+- [x] **会员充值功能**（人脸识别验证）
+- [x] **设置界面**（用户信息、缓存管理、服务器配置）
+- [x] 关怀模式（大字体显示）
+- [x] 语音输入/朗读功能
+- [x] 聊天历史记录
+- [x] 自动重连机制
 - [x] 实时显示连接状态
+
+### 医师客户端
+
+- [x] 医生账号登录/注册
+- [x] 医生聊天界面
+- [x] 患者消息实时接收
+- [x] **设置界面**（用户信息、缓存管理、服务器配置）
+- [x] 历史记录查看
+- [x] 实时显示在线状态
 
 ## 安装和运行
 
@@ -66,7 +93,7 @@ Project_End/
 
 ```bash
 # 进入服务器目录
-cd Project_End/Server
+cd Smart-Medica-Terminal/Server_python
 
 # 安装 Python 依赖
 pip install -r requirements.txt
@@ -79,8 +106,6 @@ ollama pull qwen2.5:7b
 
 # 启动服务器
 python server.py
-
-# Windows 用户可直接双击：启动服务器.bat
 ```
 
 服务器将在 `0.0.0.0:9999` 端口监听。
@@ -89,23 +114,34 @@ python server.py
 
 #### 环境要求
 
-- Qt 6.x
+- Qt 6.x（推荐 6.11+）
 - MinGW 64-bit 编译器
 - Qt Multimedia 模块
 - Qt Network 模块
+- Qt Widgets 模块
 
-#### 编译步骤
+#### 编译步骤（普通用户客户端）
 
 ```bash
 # 进入 Qt 项目目录
-cd Project_End/Client_Qt/Client
+cd Smart-Medica-Terminal/Client_Qt/Client
 
 # 使用 Qt Creator 打开 dontknow.pro
 # 或者在命令行编译：
 qmake dontknow.pro
 mingw32-make
+```
 
-# 运行客户端
+#### 编译步骤（医师客户端）
+
+```bash
+# 进入 Qt 项目目录
+cd Smart-Medica-Terminal/Client_Qt/Client_Doctor
+
+# 使用 Qt Creator 打开 medical.pro
+# 或者在命令行编译：
+qmake medical.pro
+mingw32-make
 ```
 
 ## 使用指南
@@ -117,40 +153,85 @@ python server.py
 ```
 
 服务器启动后，会显示以下日志：
+- 数据库初始化状态
 - Ollama 服务状态检查
 - AI 模型加载状态
 - 客户端连接/断开日志
 - 消息处理日志
 
-### 2. 客户端使用
+### 2. 普通用户客户端使用
 
 #### 登录/注册
 
 1. 打开客户端程序
 2. 在登录界面输入用户名和密码
-3. 点击"登录"进入主界面
+3. 点击"登录"进入主菜单
 4. 或点击"注册"创建新账号
 
-#### 连接服务器
+#### 主菜单
 
-1. 在服务器地址栏输入服务器 IP（例如：127.0.0.1）
-2. 输入端口号（默认：9999）
-3. 点击"连接服务器"按钮
-4. 连接成功后会显示状态信息
+主菜单包含以下功能按钮：
+- **问诊咨询**：与 AI 助手进行健康咨询
+- **病历记录**：查看和管理病历信息
+- **名医对话**：与在线医生进行实时交流
+- **会员充值**：开通会员服务
 
-#### AI 对话
+#### AI 对话（问诊咨询）
 
-1. 在输入框中输入消息
+1. 在输入框中输入健康问题
 2. 点击"发送"按钮或按回车发送消息
-3. 等待 AI（茯苓）回复
+3. 等待 AI 回复
 4. 对话内容会实时显示在文本区域
+5. 支持语音输入和朗读功能
 
-#### 语音输入
+#### 病历记录
 
-1. 按住麦克风按钮开始录音
-2. 松开按钮结束录音
-3. 录音文件会保存在本地
-4. （可选）集成百度语音 API 进行语音识别
+1. 查看已保存的病历列表
+2. 点击病历查看详细内容（新窗口打开）
+3. 支持添加新病历
+
+#### 名医对话
+
+1. 点击"名医对话"按钮进入
+2. 系统自动连接服务器并分配在线医生
+3. 直接进入聊天界面，无需选择医生
+4. 消息直接转发给医生，不经过 AI 处理
+
+#### 会员充值
+
+1. 点击"会员充值"按钮进入
+2. 显示会员套餐信息
+3. 点击"立即购买"进入人脸识别验证
+4. 等待 3 秒人脸识别
+5. 显示识别成功，3 秒后返回菜单
+6. 再次进入显示"已开通会员"
+
+#### 设置界面
+
+设置界面包含三个标签页：
+- **用户信息**：查看/修改性别、年龄等信息，支持退出登录
+- **缓存管理**：清除聊天记录和病历缓存
+- **服务器配置**：设置服务器 IP 和端口
+
+### 3. 医师客户端使用
+
+#### 登录
+
+1. 打开医师客户端程序
+2. 输入医生账号和密码（需先注册）
+3. 点击"登录"进入聊天界面
+
+#### 医生聊天
+
+1. 等待患者连接
+2. 收到患者消息时会显示提示
+3. 在输入框中输入回复
+4. 点击"发送回复"按钮发送消息
+
+#### 设置
+
+1. 点击"设置"按钮打开设置界面
+2. 可修改用户信息、清除缓存、配置服务器
 
 ## 网络协议
 
@@ -164,56 +245,112 @@ python server.py
 [4字节大端序长度][JSON数据]
 ```
 
-#### 发送消息
+#### 消息类型
+
+| 消息类型 | 说明 | 发送方 |
+|---------|------|--------|
+| `login` | 用户登录 | 客户端/医师客户端 |
+| `register` | 用户注册 | 客户端/医师客户端 |
+| `message` | AI 对话消息 | 客户端 |
+| `ai_response` | AI 响应 | 服务器 |
+| `get_doctors` | 获取医生列表 | 客户端 |
+| `request_doctor` | 请求连接医生 | 客户端 |
+| `connect_doctor` | 连接指定医生 | 客户端 |
+| `doctor_message` | 医患消息 | 客户端/医师客户端 |
+| `client_message` | 医患消息 | 服务器转发 |
+| `new_client` | 新患者连接通知 | 服务器转发 |
+
+#### 登录消息示例
+
+```json
+{
+  "type": "login",
+  "username": "user123",
+  "password": "password",
+  "role": "client"
+}
+```
+
+#### AI 对话消息示例
 
 ```json
 {
   "type": "message",
-  "data": "用户输入的文本"
+  "data": "我最近头痛，应该怎么办？"
 }
 ```
 
-#### AI 响应
+#### 医患消息示例
 
 ```json
 {
-  "type": "ai_response",
-  "data": "AI 生成的响应文本"
+  "type": "doctor_message",
+  "message": "你好，有什么可以帮助你的？",
+  "sender": "doctor"
 }
 ```
 
-### 兼容性说明
+## 关键功能实现说明
 
-服务器同时兼容两种字段名：
-- `data`（推荐）
-- `message`（旧版本兼容）
+### 1. 名医对话机制
+
+**流程**：
+1. 患者进入名医对话 → 登录服务器
+2. 发送 `request_doctor` 请求 → 服务器分配空闲医生
+3. 服务器发送 `connection_success` → 打开聊天窗口
+4. 患者发送消息 → 服务器转发给医生 → 医生回复 → 服务器转发给患者
+
+**特点**：
+- 跳过选择医生环节，自动分配
+- 消息直接转发，不经过 AI 处理
+- 支持多个医患对同时在线
+
+### 2. 会员充值验证
+
+**流程**：
+1. 用户点击"立即购买" → 进入验证页面
+2. 显示"正在进行人脸识别..."（3秒）
+3. 显示人脸图片和"识别成功"（3秒）
+4. 返回菜单，标记为会员
+
+**特点**：
+- 本地验证，无需真实人脸识别
+- 会员状态持久化保存
+- 已开通会员无法重复购买
+
+### 3. 关怀模式
+
+**功能**：
+- 大字体显示
+- 调整字体颜色和背景颜色
+- 影响所有界面（聊天、病历、设置等）
 
 ## 修复的关键问题
 
-### 1. 消息发送问题
+### 1. 名医显示问题
 
-**问题**：客户端发送消息时没有发送 4 字节长度头，服务器收不到消息
-
-**修复**：
-- 在 `widget.cpp` 的 `on_pushButton_clicked()` 中添加了长度头发送逻辑
-- 使用 `QDataStream` 确保大端序字节序
-- 添加了 `flush()` 确保数据立即发送
-
-### 2. 消息读取问题
-
-**问题**：客户端读取消息时没有处理粘包，字段名不匹配
+**问题**：患者端无法看到在线医生
 
 **修复**：
-- 在 `widget.h` 中添加了 `QByteArray buffer` 来处理粘包
-- 重写了 `readData()` 函数，正确处理数据包拆分
-- 修正了字段名从 `"message"` 改为 `"data"`
+- 医生登录时发送 `login` 请求给服务器
+- 服务器验证后将医生添加到在线列表
+- 患者登录后发送 `request_doctor` 请求
+- 服务器自动分配空闲医生
 
-### 3. 服务器兼容性问题
+### 2. 设置页面重叠问题
 
-**问题**：服务器只读取 `data` 字段，不兼容旧版本格式
+**问题**：医生客户端设置页面与聊天界面重叠
 
 **修复**：
-- 在 `server.py` 中添加了对 `message` 字段的兼容读取
+- 创建 `SettingsWidget_Doc` 时不设置父窗口
+- 设置页面以独立窗口形式弹出
+
+### 3. 按钮信号连接问题
+
+**问题**：设置按钮点击无响应
+
+**修复**：
+- 在 `initConnections()` 中添加按钮信号连接
 
 ## 开发说明
 
@@ -227,6 +364,7 @@ python server.py
 ### 自定义 AI 模型
 
 修改 `server.py` 中的 `model_name` 变量：
+
 ```python
 model_name = "your-model-name"
 ```
@@ -241,6 +379,7 @@ model_name = "your-model-name"
 2. **Ollama 服务**：确保 Ollama 服务正常运行
 3. **防火墙**：确保防火墙允许 9999 端口通信
 4. **录音权限**：确保客户端有麦克风访问权限
+5. **数据库**：首次运行服务器会自动创建数据库文件
 
 ## 常见问题
 
@@ -257,11 +396,11 @@ model_name = "your-model-name"
 - 检查网络连接
 - 检查防火墙设置
 
-### 发送消息服务器收不到
+### 名医对话无法连接
 
-- 确保已应用本项目的修复代码
-- 检查服务器日志是否有数据到达
-- 确认网络连接正常
+- 确保医生客户端已登录
+- 检查服务器日志确认医生是否在线
+- 确保服务器已正确启动
 
 ### AI 无响应
 
@@ -271,9 +410,10 @@ model_name = "your-model-name"
 
 ## 技术栈
 
-- **后端**：Python 3.8+, sockets, langchain-ollama
+- **后端**：Python 3.8+, sockets, sqlite3, langchain-ollama
 - **前端**：Qt 6.x, C++17
-- **AI 引擎**：Ollama
+- **AI 引擎**：Ollama (qwen2.5:7b)
+- **数据库**：SQLite
 - **音频**：Qt Multimedia
 
 ## 许可证

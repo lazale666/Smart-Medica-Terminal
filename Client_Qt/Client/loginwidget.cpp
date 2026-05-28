@@ -25,6 +25,39 @@ LoginWidget::LoginWidget(QWidget *parent)
     m_bgPath = bgPath;
 
     setFixedSize(1017, 398);
+    setStyleSheet(R"(
+        QLabel#titleLabel {
+            color: #EAFBFF;
+            font: 700 30px "Microsoft YaHei";
+            letter-spacing: 1px;
+        }
+        QLineEdit {
+            background: rgba(4, 15, 31, 0.78);
+            border: 1px solid rgba(0, 229, 255, 0.75);
+            border-radius: 16px;
+            color: #EAFBFF;
+            padding: 12px 18px;
+            font: 14px "Microsoft YaHei";
+            min-height: 24px;
+        }
+        QLineEdit:focus {
+            border: 2px solid #00E5FF;
+            background: rgba(6, 24, 45, 0.88);
+        }
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00E5FF, stop:1 #31FFB7);
+            border: 1px solid rgba(234, 251, 255, 0.75);
+            border-radius: 16px;
+            color: #03111D;
+            padding: 10px 24px;
+            font: 700 14px "Microsoft YaHei";
+            min-height: 28px;
+        }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #31FFB7, stop:1 #00E5FF);
+        }
+    )");
+    ui->titleLabel->setStyleSheet("color: #EAFBFF; font: 700 30px \"Microsoft YaHei\";");
 
     updateBackground();
 }
@@ -100,15 +133,15 @@ void LoginWidget::on_loginBtn_clicked()
     QString password = ui->passwordEdit->text();
 
     if (username.isEmpty() || password.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请输入用户名和密码");
+        QMessageBox::warning(nullptr, "提示", "请输入用户名和密码");
         return;
     }
 
     if (checkUser(username, password)) {
-        QMessageBox::information(this, "成功", "登录成功！");
+        QMessageBox::information(nullptr, "成功", "登录成功！");
         emit loginSuccess(username);
     } else {
-        QMessageBox::warning(this, "失败", "用户名或密码错误");
+        QMessageBox::warning(nullptr, "失败", "用户名或密码错误");
     }
 }
 
@@ -118,14 +151,14 @@ void LoginWidget::on_registerBtn_clicked()
     QString password = ui->passwordEdit->text();
 
     if (username.isEmpty() || password.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请输入用户名和密码");
+        QMessageBox::warning(nullptr, "提示", "请输入用户名和密码");
         return;
     }
 
     if (registerUser(username, password)) {
-        QMessageBox::information(this, "成功", "注册成功！请登录");
+        QMessageBox::information(nullptr, "成功", "注册成功！请登录");
         ui->passwordEdit->clear();
     } else {
-        QMessageBox::warning(this, "失败", "用户名已存在");
+        QMessageBox::warning(nullptr, "失败", "用户名已存在");
     }
 }

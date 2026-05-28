@@ -29,8 +29,8 @@ Widget::Widget(QWidget *parent)
     m_isNewSession = true;
     m_autoConnect = true;
     m_currentMode = "普通模式";
-    m_fontColor = "#000000";
-    m_bgColor = "#ffffff";
+    m_fontColor = "#D8F7FF";
+    m_bgColor = "#07111F";
 
     connect(socket, &QTcpSocket::connected, this, &Widget::connectService);
     connect(socket, &QTcpSocket::disconnected, this, &Widget::disConnectService);
@@ -77,8 +77,8 @@ void Widget::loadSettings()
     m_serverPort = m_settings->value("serverPort", 9999).toUInt();
     m_autoConnect = m_settings->value("autoConnect", true).toBool();
     m_currentMode = m_settings->value("mode", "普通模式").toString();
-    m_fontColor = m_settings->value("fontColor", "#000000").toString();
-    m_bgColor = m_settings->value("bgColor", "#ffffff").toString();
+    m_fontColor = m_settings->value("fontColor", "#D8F7FF").toString();
+    m_bgColor = m_settings->value("bgColor", "#07111F").toString();
 
     applyModeSettings(m_currentMode);
     applyBgColor(m_bgColor);
@@ -149,20 +149,43 @@ void Widget::applyModeSettings(const QString &mode)
 
 void Widget::applyFontColor(const QString &color)
 {
-    m_fontColor = color;
-    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: %2; }").arg(color).arg(m_bgColor));
-    ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; }").arg(color).arg(m_bgColor));
-    ui->userLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(color));
-    ui->chatTitleLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(color));
-    ui->voiceLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(color));
+    m_fontColor = (color.compare("#000000", Qt::CaseInsensitive) == 0) ? "#D8F7FF" : color;
+    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 16px; padding: 12px; }").arg(m_fontColor));
+    ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.55); border-radius: 16px; padding: 8px 12px; }").arg(m_fontColor));
+    ui->userLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
+    ui->chatTitleLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
+    ui->voiceLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(m_fontColor));
 }
 
 void Widget::applyBgColor(const QString &color)
 {
-    m_bgColor = color;
-    ui->textBrowser->setStyleSheet(QString("QTextBrowser { color: %1; background-color: %2; }").arg(m_fontColor).arg(color));
-    ui->lineEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; }").arg(m_fontColor).arg(color));
-    this->setStyleSheet(QString("QWidget { background-color: %1; }").arg(color));
+    m_bgColor = (color.compare("#ffffff", Qt::CaseInsensitive) == 0) ? "#07111F" : color;
+    applyFontColor(m_fontColor);
+    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
+        setStyleSheet(R"(
+            QWidget#Widget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+            }
+            QWidget#leftWidget {
+                background: rgba(4, 15, 31, 0.82);
+                border: 1px solid rgba(0, 229, 255, 0.30);
+                border-radius: 18px;
+            }
+            QLabel#historyTitle {
+                color: #00E5FF;
+                font-weight: 700;
+            }
+            QListWidget#historyList {
+                background: rgba(2, 9, 20, 0.76);
+                border: 1px solid rgba(0, 229, 255, 0.28);
+                border-radius: 14px;
+                color: #EAFBFF;
+                padding: 8px;
+            }
+        )");
+    } else {
+        setStyleSheet(QString("QWidget#Widget { background-color: %1; }").arg(m_bgColor));
+    }
 }
 
 void Widget::connectToServer()
@@ -314,7 +337,7 @@ void Widget::disConnectService()
 void Widget::connectError(QAbstractSocket::SocketError err)
 {
     if (!errFlag) {
-        int btn = QMessageBox::warning(this, "网络错误", "服务器错误:" + QString::number(err), QMessageBox::Ok | QMessageBox::Close);
+        int btn = QMessageBox::warning(nullptr, "网络错误", "服务器错误:" + QString::number(err), QMessageBox::Ok | QMessageBox::Close);
         if (btn == QMessageBox::Ok) {
             if (conFlag) {
                 errFlag = 1;
@@ -507,22 +530,54 @@ void Widget::onSettingsBtnClicked()
 
 void Widget::onLogout()
 {
+    timer->stop();
+    historyTimer->stop();
+    m_isThinking = false;
+    m_isInterrupted = false;
+    conFlag = 0;
+
+    disconnect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
+    if (socket->state() == QTcpSocket::ConnectedState ||
+        socket->state() == QTcpSocket::ConnectingState) {
+        socket->disconnectFromHost();
+    }
+
     if (settingsWidget) {
-        settingsWidget->close();
-        delete settingsWidget;
+        SettingsWidget *widget = settingsWidget;
         settingsWidget = nullptr;
+        widget->close();
+        widget->deleteLater();
     }
     emit backToMenu();
 }
 
 void Widget::onLogoutFromSettings()
 {
+    timer->stop();
+    historyTimer->stop();
+    disconnect(socket, &QTcpSocket::readyRead, this, &Widget::readData);
+    if (socket->state() == QTcpSocket::ConnectedState ||
+        socket->state() == QTcpSocket::ConnectingState) {
+        socket->disconnectFromHost();
+    }
+
     if (settingsWidget) {
-        settingsWidget->close();
-        delete settingsWidget;
+        SettingsWidget *widget = settingsWidget;
         settingsWidget = nullptr;
+        widget->close();
+        widget->deleteLater();
     }
     emit logout();
+}
+
+void Widget::onCloseSettings()
+{
+    if (settingsWidget) {
+        SettingsWidget *widget = settingsWidget;
+        settingsWidget = nullptr;
+        widget->close();
+        widget->deleteLater();
+    }
 }
 
 void Widget::onModeChanged(const QString &mode)
@@ -552,15 +607,6 @@ void Widget::onServerConfigChanged(const QString &ip, quint16 port, bool autoCon
     }
 }
 
-void Widget::onCloseSettings()
-{
-    if (settingsWidget) {
-        settingsWidget->close();
-        delete settingsWidget;
-        settingsWidget = nullptr;
-    }
-}
-
 void Widget::onSpeechSettingsChanged(double volume, double rate)
 {
     m_speech->setVolume(volume);
@@ -571,7 +617,7 @@ void Widget::onReadBtnClicked()
 {
     QString text = ui->textBrowser->toPlainText();
     if (text.isEmpty()) {
-        QMessageBox::information(this, "提示", "没有可朗读的内容");
+        QMessageBox::information(nullptr, "提示", "没有可朗读的内容");
         return;
     }
 
@@ -598,7 +644,7 @@ void Widget::onReadBtnClicked()
     }
 
     if (lastMessage.isEmpty()) {
-        QMessageBox::information(this, "提示", "没有找到可朗读的内容");
+        QMessageBox::information(nullptr, "提示", "没有找到可朗读的内容");
         return;
     }
 

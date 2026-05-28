@@ -84,6 +84,18 @@ def verify_user(username, password, role=None):
     conn.close()
     return result is not None
 
+def user_exists(username, role=None):
+    """Check whether a user already exists."""
+    conn = sqlite3.connect(database_path)
+    cursor = conn.cursor()
+    if role:
+        cursor.execute('SELECT 1 FROM users WHERE username=? AND role=?', (username, role))
+    else:
+        cursor.execute('SELECT 1 FROM users WHERE username=?', (username,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
 def init_ollama():
     """Initialize ollama model"""
     global ollm
@@ -193,12 +205,18 @@ def handle_client(client_socket, addr):
                             role = msg_dict.get('role', 'client')
                             logger.info(f"[DEBUG] Login attempt: username={username}, role={role}")
                             
-                            if not verify_user(username, password, role):
-                                if role == 'doctor':
+                            authenticated = verify_user(username, password, role)
+                            if not authenticated and role == 'client' and password == '' and username:
+                                if not user_exists(username, role):
                                     add_user(username, password, role)
-                                    logger.info(f"Doctor {username} auto registered")
-                            
-                            if verify_user(username, password, role):
+                                    logger.info(f"User {username} auto registered as {role}")
+                                authenticated = True
+                            elif not authenticated and username and not user_exists(username, role):
+                                add_user(username, password, role)
+                                logger.info(f"User {username} auto registered as {role}")
+                                authenticated = verify_user(username, password, role)
+
+                            if authenticated:
                                 client_info['name'] = username
                                 client_info['role'] = role
                                 client_info['current_client'] = None
@@ -277,6 +295,40 @@ def handle_client(client_socket, addr):
                                 send_response(client_socket, {'type': 'connection_failed', 'message': 'Doctor not available'})
                                 logger.warning(f"Doctor not found: {doctor_id}")
 
+                        elif msg_dict.get('type') == 'request_doctor':
+                            request_username = msg_dict.get('username')
+                            client_info['role'] = 'client'
+                            if request_username:
+                                client_info['name'] = request_username
+                            elif not client_info.get('name'):
+                                client_info['name'] = 'Unknown'
+                            logger.info(f"[DEBUG] Client {client_info.get('name')} requesting doctor connection")
+                            target_doctor = None
+                            
+                            with clients_lock:
+                                for doctor in doctors:
+                                    if doctor.get('current_client') is None:
+                                        target_doctor = doctor
+                                        break
+                            
+                            if target_doctor:
+                                client_info['current_doctor'] = target_doctor
+                                target_doctor['current_client'] = client_info
+                                
+                                send_response(client_socket, {
+                                    'type': 'connection_success',
+                                    'message': 'Connected to doctor',
+                                    'doctor_name': target_doctor.get('name', 'Unknown')
+                                })
+                                send_response(target_doctor['socket'], {
+                                    'type': 'new_client',
+                                    'client_name': client_info.get('name', 'Unknown')
+                                })
+                                logger.info(f"Auto-connected client {client_info.get('name')} with doctor {target_doctor.get('name')}")
+                            else:
+                                send_response(client_socket, {'type': 'waiting_for_doctor', 'message': 'No doctors available, please wait'})
+                                logger.info(f"No doctors available for client {client_info.get('name')}")
+
                         elif msg_dict.get('type') == 'doctor_message':
                             if client_info['role'] == 'client' and client_info.get('current_doctor'):
                                 message = msg_dict.get('message')
@@ -294,6 +346,12 @@ def handle_client(client_socket, addr):
                                     'message': message
                                 })
                                 logger.info(f"Forwarded message from doctor {client_info.get('name')} to client")
+                            else:
+                                send_response(client_socket, {
+                                    'type': 'connection_failed',
+                                    'message': 'No active doctor-client session'
+                                })
+                                logger.warning(f"Message dropped because no active session exists for {client_info.get('name')}")
 
                     except json.JSONDecodeError as e:
                         logger.error(f"JSON parsing failed: {e}")
@@ -312,8 +370,7 @@ def handle_client(client_socket, addr):
             elif client_info.get('role') == 'doctor' and client_info.get('current_client'):
                 client_info['current_client']['current_doctor'] = None
             
-            if client_socket in [c['socket'] for c in clients]:
-                clients.remove(client_info)
+            clients[:] = [c for c in clients if c.get('socket') is not client_socket]
             if client_info in doctors:
                 doctors.remove(client_info)
                 logger.info(f"Doctor {client_info.get('name')} disconnected, remaining doctors: {len(doctors)}")

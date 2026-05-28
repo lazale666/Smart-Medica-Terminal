@@ -13,8 +13,8 @@ MenuWidget::MenuWidget(QWidget *parent) :
     m_serverIP("127.0.0.1"),
     m_serverPort(9999),
     m_autoConnect(true),
-    m_fontColor("#000000"),
-    m_bgColor("#ffffff")
+    m_fontColor("#D8F7FF"),
+    m_bgColor("#07111F")
 {
     ui->setupUi(this);
 
@@ -67,14 +67,41 @@ void MenuWidget::disconnectFromServer()
 
 void MenuWidget::applyFontColor(const QString &color)
 {
-    m_fontColor = color;
-    ui->userLabel->setStyleSheet(QString("QLabel { color: %1; }").arg(color));
+    m_fontColor = (color.compare("#000000", Qt::CaseInsensitive) == 0) ? "#D8F7FF" : color;
+    ui->userLabel->setStyleSheet(QString("QLabel { color: %1; font-weight: 700; }").arg(m_fontColor));
 }
 
 void MenuWidget::applyBgColor(const QString &color)
 {
-    m_bgColor = color;
-    this->setStyleSheet(QString("QWidget { background-color: %1; }").arg(color));
+    m_bgColor = (color.compare("#ffffff", Qt::CaseInsensitive) == 0) ? "#07111F" : color;
+    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
+        setStyleSheet(R"(
+            QWidget#MenuWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+            }
+            QLabel#titleLabel {
+                color: #00E5FF;
+                font: 700 30px "Microsoft YaHei";
+            }
+            QLabel#statusLabel {
+                color: #31FFB7;
+            }
+            QPushButton#chatBtn, QPushButton#medicalRecordBtn, QPushButton#doctorChatBtn, QPushButton#memberRechargeBtn {
+                background: rgba(2, 9, 20, 0.72);
+                border: 1px solid rgba(0, 229, 255, 0.48);
+                border-radius: 22px;
+                color: #EAFBFF;
+                font: 700 20px "Microsoft YaHei";
+                min-height: 94px;
+            }
+            QPushButton#chatBtn:hover, QPushButton#medicalRecordBtn:hover, QPushButton#doctorChatBtn:hover, QPushButton#memberRechargeBtn:hover {
+                background: rgba(0, 229, 255, 0.16);
+                border-color: #00E5FF;
+            }
+        )");
+    } else {
+        setStyleSheet(QString("QWidget#MenuWidget { background-color: %1; }").arg(m_bgColor));
+    }
 }
 
 void MenuWidget::onChatBtnClicked()
@@ -147,8 +174,8 @@ void MenuWidget::loadSettings()
     m_serverIP = m_settings->value("serverIP", "127.0.0.1").toString();
     m_serverPort = m_settings->value("serverPort", 9999).toInt();
     m_autoConnect = m_settings->value("autoConnect", true).toBool();
-    m_fontColor = m_settings->value("fontColor", "#000000").toString();
-    m_bgColor = m_settings->value("bgColor", "#ffffff").toString();
+    m_fontColor = m_settings->value("fontColor", "#D8F7FF").toString();
+    m_bgColor = m_settings->value("bgColor", "#07111F").toString();
     applyFontColor(m_fontColor);
     applyBgColor(m_bgColor);
 }
@@ -164,13 +191,13 @@ void MenuWidget::updateConnectionStatus()
 {
     if (socket->state() == QTcpSocket::ConnectedState) {
         ui->statusLabel->setText("服务器状态：已连接");
-        ui->statusLabel->setStyleSheet("color: green; font-weight: bold;");
+        ui->statusLabel->setStyleSheet("color: #31FFB7; font-weight: bold;");
     } else if (socket->state() == QTcpSocket::ConnectingState) {
         ui->statusLabel->setText("服务器状态：连接中...");
-        ui->statusLabel->setStyleSheet("color: orange; font-weight: bold;");
+        ui->statusLabel->setStyleSheet("color: #FFCF5A; font-weight: bold;");
     } else {
         ui->statusLabel->setText("服务器状态：未连接");
-        ui->statusLabel->setStyleSheet("color: red; font-weight: bold;");
+        ui->statusLabel->setStyleSheet("color: #FF5F7E; font-weight: bold;");
     }
 }
 
@@ -197,5 +224,5 @@ void MenuWidget::onDoctorChatBtnClicked()
 
 void MenuWidget::onMemberRechargeBtnClicked()
 {
-    QMessageBox::information(this, "会员充值", "会员充值功能开发中...");
+    emit openMemberRecharge();
 }

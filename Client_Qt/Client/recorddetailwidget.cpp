@@ -10,6 +10,22 @@ RecordDetailWidget::RecordDetailWidget(QWidget *parent) :
     m_currentMode("普通模式")
 {
     ui->setupUi(this);
+    setStyleSheet(R"(
+        QWidget#RecordDetailWidget {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+        }
+        QLabel#titleLabel {
+            color: #00E5FF;
+            font-weight: 700;
+        }
+        QTextEdit, QDateEdit {
+            background: rgba(2, 9, 20, 0.86);
+            color: #EAFBFF;
+            border: 1px solid rgba(0, 229, 255, 0.38);
+            border-radius: 14px;
+            padding: 8px 12px;
+        }
+    )");
     ui->dateEdit->setDate(QDate::currentDate());
 
     connect(ui->closeBtn, &QPushButton::clicked, this, &RecordDetailWidget::close);

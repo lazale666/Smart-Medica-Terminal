@@ -28,6 +28,7 @@ private:
     QTcpSocket *m_socket;
     QString m_username;
     QString m_doctorName;
+    QByteArray m_buffer;
 
     void sendMessage(const QString &message);
 };

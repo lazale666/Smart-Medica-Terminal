@@ -66,7 +66,7 @@ void Widget::connectError(QAbstractSocket::SocketError err)
 {
     if(!errFlag)
     {
-        int btn = QMessageBox::warning(this,"网络错误","服务器错误:"+QString::number(err),QMessageBox::Ok|QMessageBox::Close);
+        int btn = QMessageBox::warning(nullptr,"网络错误","服务器错误:"+QString::number(err),QMessageBox::Ok|QMessageBox::Close);
         if(btn==QMessageBox::Ok)
         {
             if(conFlag)

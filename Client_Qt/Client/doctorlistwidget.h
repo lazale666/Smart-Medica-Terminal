@@ -28,8 +28,6 @@ private slots:
     void connectToServer();
     void readData();
     void requestDoctorList();
-    void onDoctorItemClicked(QListWidgetItem *item);
-    void refreshDoctorList();
     void onBackBtnClicked();
 
 private:
@@ -39,7 +37,7 @@ private:
     int m_serverPort;
     QString m_username;
     QTimer *refreshTimer;
-    char data[4];
+    QByteArray m_buffer;
 
     void sendRequest(const QJsonObject &obj);
 };

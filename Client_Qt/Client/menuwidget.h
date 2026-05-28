@@ -28,6 +28,7 @@ signals:
     void openChat(const QString &serverIP, int serverPort, bool autoConnect);
     void openMedicalRecord(const QString &serverIP, int serverPort, bool autoConnect);
     void openDoctorChat(const QString &serverIP, int serverPort);
+    void openMemberRecharge();
     void logout();
 
 private slots:

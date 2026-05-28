@@ -16,7 +16,8 @@ SOURCES += \
     speech.cpp \
     http.cpp \
     doctorchatwidget.cpp \
-    historydialog.cpp
+    historydialog.cpp \
+    settingswidget_doc.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -27,7 +28,8 @@ HEADERS += \
     speech.h \
     http.h \
     doctorchatwidget.h \
-    historydialog.h
+    historydialog.h \
+    settingswidget_doc.h
 
 FORMS += \
     mainwindow.ui \
@@ -35,7 +37,8 @@ FORMS += \
     loginwidget.ui \
     dialog.ui \
     doctorchatwidget.ui \
-    historydialog.ui
+    historydialog.ui \
+    settingswidget_doc.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

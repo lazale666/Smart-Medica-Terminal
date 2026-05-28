@@ -11,10 +11,12 @@ SOURCES += \
     dialog.cpp \
     doctordialog.cpp \
     doctorlistwidget.cpp \
+    facerecognizewidget.cpp \
     http.cpp \
     loginwidget.cpp \
     main.cpp \
     mainwindow.cpp \
+    memberrechargewidget.cpp \
     menuwidget.cpp \
     medicalrecordwidget.cpp \
     recorddetailwidget.cpp \
@@ -27,9 +29,11 @@ HEADERS += \
     dialog.h \
     doctordialog.h \
     doctorlistwidget.h \
+    facerecognizewidget.h \
     http.h \
     loginwidget.h \
     mainwindow.h \
+    memberrechargewidget.h \
     menuwidget.h \
     medicalrecordwidget.h \
     recorddetailwidget.h \
@@ -41,8 +45,10 @@ FORMS += \
     dialog.ui \
     doctordialog.ui \
     doctorlistwidget.ui \
+    facerecognizewidget.ui \
     loginwidget.ui \
     mainwindow.ui \
+    memberrechargewidget.ui \
     menuwidget.ui \
     medicalrecordwidget.ui \
     recorddetailwidget.ui \

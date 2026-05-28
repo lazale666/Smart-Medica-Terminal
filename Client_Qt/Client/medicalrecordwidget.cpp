@@ -21,10 +21,19 @@ MedicalRecordWidget::MedicalRecordWidget(QWidget *parent) :
     m_isAiThinking(false),
     m_detailWidget(nullptr),
     settingsWidget(nullptr),
-    m_fontColor("#000000"),
-    m_bgColor("#ffffff")
+    m_fontColor("#D8F7FF"),
+    m_bgColor("#07111F")
 {
     ui->setupUi(this);
+    setStyleSheet(R"(
+        QWidget#MedicalRecordWidget {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+        }
+        QLabel#titleLabel, QLabel#recordListLabel {
+            color: #00E5FF;
+            font-weight: 700;
+        }
+    )");
 
     socket = new QTcpSocket(this);
     connect(socket, &QTcpSocket::connected, this, &MedicalRecordWidget::onSocketConnected);
@@ -115,19 +124,29 @@ void MedicalRecordWidget::applyModeSettings(const QString &mode)
 
 void MedicalRecordWidget::applyFontColor(const QString &color)
 {
-    m_fontColor = color;
-    ui->diseaseEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; }").arg(color).arg(m_bgColor));
-    ui->treatmentEdit->setStyleSheet(QString("QTextEdit { color: %1; background-color: %2; }").arg(color).arg(m_bgColor));
-    ui->recordList->setStyleSheet(QString("QListWidget { color: %1; background-color: %2; }").arg(color).arg(m_bgColor));
+    m_fontColor = (color.compare("#000000", Qt::CaseInsensitive) == 0) ? "#D8F7FF" : color;
+    ui->diseaseEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor));
+    ui->treatmentEdit->setStyleSheet(QString("QTextEdit { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor));
+    ui->recordList->setStyleSheet(QString("QListWidget { color: %1; background-color: rgba(2, 9, 20, 0.86); border: 1px solid rgba(0, 229, 255, 0.38); border-radius: 14px; padding: 8px 12px; }").arg(m_fontColor));
 }
 
 void MedicalRecordWidget::applyBgColor(const QString &color)
 {
-    m_bgColor = color;
-    ui->diseaseEdit->setStyleSheet(QString("QLineEdit { color: %1; background-color: %2; }").arg(m_fontColor).arg(color));
-    ui->treatmentEdit->setStyleSheet(QString("QTextEdit { color: %1; background-color: %2; }").arg(m_fontColor).arg(color));
-    ui->recordList->setStyleSheet(QString("QListWidget { color: %1; background-color: %2; }").arg(m_fontColor).arg(color));
-    this->setStyleSheet(QString("QWidget { background-color: %1; }").arg(color));
+    m_bgColor = (color.compare("#ffffff", Qt::CaseInsensitive) == 0) ? "#07111F" : color;
+    applyFontColor(m_fontColor);
+    if (m_bgColor.compare("#07111F", Qt::CaseInsensitive) == 0) {
+        setStyleSheet(R"(
+            QWidget#MedicalRecordWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #04111F, stop:0.55 #071B2F, stop:1 #0B1023);
+            }
+            QLabel#titleLabel, QLabel#recordListLabel {
+                color: #00E5FF;
+                font-weight: 700;
+            }
+        )");
+    } else {
+        setStyleSheet(QString("QWidget#MedicalRecordWidget { background-color: %1; }").arg(m_bgColor));
+    }
 }
 
 void MedicalRecordWidget::onSettingsBtnClicked()
@@ -192,12 +211,12 @@ void MedicalRecordWidget::onAiFillBtnClicked()
 {
     QString diseaseName = ui->diseaseEdit->text().trimmed();
     if (diseaseName.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请先输入疾病名称");
+        QMessageBox::warning(nullptr, "提示", "请先输入疾病名称");
         return;
     }
 
     if (m_isAiThinking) {
-        QMessageBox::warning(this, "提示", "AI正在思考中，请等待");
+        QMessageBox::warning(nullptr, "提示", "AI正在思考中，请等待");
         return;
     }
 
@@ -234,17 +253,17 @@ void MedicalRecordWidget::onSaveBtnClicked()
     QString treatment = ui->treatmentEdit->toPlainText().trimmed();
 
     if (diseaseName.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请输入疾病名称");
+        QMessageBox::warning(nullptr, "提示", "请输入疾病名称");
         return;
     }
 
     if (treatment.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请填写治疗建议");
+        QMessageBox::warning(nullptr, "提示", "请填写治疗建议");
         return;
     }
 
     saveRecord(diseaseName, diagnosisDate, treatment);
-    QMessageBox::information(this, "提示", "病例保存成功");
+    QMessageBox::information(nullptr, "提示", "病例保存成功");
 
     ui->diseaseEdit->clear();
     ui->dateEdit->setDate(QDate::currentDate());
@@ -380,7 +399,7 @@ void MedicalRecordWidget::onSocketError(QAbstractSocket::SocketError error)
     ui->aiFillBtn->setEnabled(true);
     ui->saveBtn->setEnabled(true);
     ui->statusLabel->setText("状态：连接失败");
-    QMessageBox::warning(this, "错误", "无法连接到服务器：" + socket->errorString());
+    QMessageBox::warning(nullptr, "错误", "无法连接到服务器：" + socket->errorString());
 }
 
 void MedicalRecordWidget::refreshRecordList()

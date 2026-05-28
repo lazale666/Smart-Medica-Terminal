@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <QResizeEvent>
 
 namespace Ui {
 class LoginWidget;
@@ -18,6 +19,9 @@ class LoginWidget : public QWidget
 public:
     explicit LoginWidget(QWidget *parent = nullptr);
     ~LoginWidget();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 
 signals:
     void loginSuccess(const QString &username);
@@ -35,8 +39,11 @@ private:
     QTcpSocket *socket;
     QString m_username;
     QString m_password;
+    QString m_bgPath;
+    QByteArray m_buffer;
 
     void sendRequest(const QJsonObject &obj);
+    void updateBackground();
     bool verifyLocalCredentials(const QString &username, const QString &password);
     bool registerLocalUser(const QString &username, const QString &password);
 };

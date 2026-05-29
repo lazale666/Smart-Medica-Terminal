@@ -1,4 +1,4 @@
-#ifndef WIDGET_H
+﻿#ifndef WIDGET_H
 #define WIDGET_H
 
 #include <QWidget>
@@ -104,6 +104,7 @@ private:
     void appendSystemMessage(const QString &message);
     void appendHistorySeparator(bool isTop);
     void setSocketHandlersActive(bool active);
+    void setThinkingState(bool thinking);
     void leaveChatScene(const std::function<void()> &afterCleanup);
     bool isCurrentUserMember() const;
     bool consumeFreeConsultQuota();
@@ -138,7 +139,7 @@ private:
     QString m_bgColor;
     QSettings *m_settings;
     int conFlag, errFlag, count;
-    bool isRecording, m_isThinking, m_isInterrupted;
+    bool isRecording, m_isThinking;
     bool m_isNewSession;
     bool m_isUserNearBottom;
     QString m_firstMessage;

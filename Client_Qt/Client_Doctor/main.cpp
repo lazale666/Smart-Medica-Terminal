@@ -77,6 +77,9 @@ static QString cyberStyleSheet()
             spacing: 8px;
             font-family: "Microsoft YaHei";
         }
+        QMessageBox, QMessageBox * {
+            color: #000000;
+        }
     )");
 }
 

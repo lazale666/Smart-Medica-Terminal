@@ -9,7 +9,8 @@
 #include <QVBoxLayout>
 #include <QtEndian>
 
-DoctorDialog::DoctorDialog(QTcpSocket *socket, const QString &username, const QString &doctorName, QWidget *parent)
+DoctorDialog::DoctorDialog(QTcpSocket *socket, const QString &username, const QString &doctorName,
+                           const QString &sessionId, QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::DoctorDialog)
     , m_messageScrollArea(nullptr)
@@ -19,6 +20,7 @@ DoctorDialog::DoctorDialog(QTcpSocket *socket, const QString &username, const QS
     , m_socket(socket)
     , m_username(username)
     , m_doctorName(doctorName)
+    , m_sessionId(sessionId)
     , m_currentMode("普通模式")
     , m_bgColor("#07111F")
     , m_fontColor("#D8F7FF")
@@ -143,6 +145,7 @@ void DoctorDialog::sendMessage(const QString &message)
     obj["type"] = "doctor_message";
     obj["message"] = message;
     obj["sender"] = m_username;
+    obj["session_id"] = m_sessionId;
 
     const QByteArray data = QJsonDocument(obj).toJson(QJsonDocument::Compact);
     const quint32 len = qToBigEndian<quint32>(static_cast<quint32>(data.size()));
@@ -220,7 +223,8 @@ void DoctorDialog::readData()
         }
 
         const QJsonObject obj = doc.object();
-        if (obj.value("type").toString() == "client_message") {
+        const QString type = obj.value("type").toString();
+        if (type == "client_message") {
             const QString sender = obj.value("sender").toString();
             const QString message = obj.value("message").toString();
             updateScrollState();
@@ -229,6 +233,11 @@ void DoctorDialog::readData()
             if (!shouldStayPinned && sender != m_username) {
                 updateNewMessageButtonVisibility(true);
             }
+        } else if (type == "doctor_disconnected") {
+            appendSystemMessage(QStringLiteral("医生已断开，请返回重新选择医生。"));
+        } else if (type == "connection_failed") {
+            const QString message = obj.value("message").toString(QStringLiteral("连接已失效，请返回重新连接医生。"));
+            appendSystemMessage(message);
         }
     }
 }

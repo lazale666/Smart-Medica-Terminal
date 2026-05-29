@@ -75,6 +75,7 @@ private:
     void rebuildModePageLayout();
     void setupAboutPage();
     void updateNavChecks(int pageIndex);
+    void updateModeUiState();
 };
 
 #endif // SETTINGSWIDGET_H

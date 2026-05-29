@@ -180,7 +180,7 @@ void SettingsWidget_Doc::onSaveServerBtnClicked()
 {
     saveSettings();
     emit serverConfigChanged(ui->ipEdit->text(), ui->portEdit->text().toUInt());
-    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
+    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
 }
 
 void SettingsWidget_Doc::onLogoutBtnClicked()
@@ -194,7 +194,7 @@ void SettingsWidget_Doc::onLogoutBtnClicked()
 
 void SettingsWidget_Doc::onClearChatHistoryClicked()
 {
-    if (QMessageBox::question(this, QStringLiteral("确认清除"), QStringLiteral("确定要清除所有聊天记录吗？"),
+    if (QMessageBox::question(nullptr, QStringLiteral("确认清除"), QStringLiteral("确定要清除所有聊天记录吗？"),
                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
         clearChatHistory();
     }
@@ -217,8 +217,8 @@ void SettingsWidget_Doc::clearChatHistory()
                 ++deletedCount;
             }
         }
-        QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("已清除 %1 条聊天记录。").arg(deletedCount));
+        QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("已清除 %1 条聊天记录。").arg(deletedCount));
     } else {
-        QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("暂无聊天记录。"));
+        QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("暂无聊天记录。"));
     }
 }

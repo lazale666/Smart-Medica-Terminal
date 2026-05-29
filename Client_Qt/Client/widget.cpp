@@ -1,4 +1,4 @@
-#include "widget.h"
+﻿#include "widget.h"
 #include "ui_widget.h"
 #include "chatmessagewidgets.h"
 #include <QDir>
@@ -56,6 +56,8 @@ Widget::Widget(QWidget *parent)
     connect(socket, &QTcpSocket::connected, this, &Widget::connectService);
     connect(socket, &QTcpSocket::disconnected, this, &Widget::disConnectService);
     connect(socket, &QTcpSocket::errorOccurred, this, &Widget::connectError);
+    setSocketHandlersActive(true);
+    connect(this, &Widget::sendInfo, dia, &Dialog::reConnectInfo);
     connect(timer, &QTimer::timeout, this, &Widget::reconnect);
     connect(historyTimer, &QTimer::timeout, this, &Widget::onHistoryLoadTimerTick);
     connect(ui->historyList, &QListWidget::itemClicked, this, &Widget::onHistoryItemClicked);
@@ -73,13 +75,13 @@ Widget::Widget(QWidget *parent)
     count = 0;
     isRecording = false;
     m_isThinking = false;
-    m_isInterrupted = false;
     m_isUserNearBottom = true;
     m_lastAssistantMessage.clear();
     m_lastReadableContent.clear();
 
     ui->chatTitleLabel->setVisible(true);
     ui->pushButton->setText("发送");
+    setThinkingState(false);
 
     loadSettings();
 
@@ -516,6 +518,12 @@ void Widget::onHistoryItemClicked(QListWidgetItem *item)
 
 void Widget::connectService()
 {
+    timer->stop();
+    count = 0;
+    errFlag = 0;
+    if (dia->isVisible()) {
+        dia->accept();
+    }
     appendSystemMessage("已连接服务器");
 }
 
@@ -551,16 +559,7 @@ void Widget::readData()
                 updateScrollState();
                 const bool shouldStayPinned = m_isUserNearBottom;
 
-                if (m_isInterrupted) {
-                    m_isThinking = false;
-                    m_isInterrupted = false;
-                    appendSystemMessage("已中断");
-                    ui->pushButton->setText("发送");
-                    continue;
-                }
-
-                m_isThinking = false;
-                ui->pushButton->setText("发送");
+                setThinkingState(false);
                 m_lastAssistantMessage = content.trimmed();
                 m_lastReadableContent = m_lastAssistantMessage;
                 appendChatMessage("创伤小组", content, false);
@@ -577,20 +576,21 @@ void Widget::disConnectService()
 {
     conFlag = 0;
     appendSystemMessage("已断开服务器");
-    m_isThinking = false;
-    m_isInterrupted = false;
-    ui->pushButton->setText("发送");
+    setThinkingState(false);
 }
 
 void Widget::connectError(QAbstractSocket::SocketError err)
 {
+    setThinkingState(false);
     if (!errFlag) {
+        count = 0;
         int btn = QMessageBox::warning(nullptr, "网络错误", "服务器错误:" + QString::number(err), QMessageBox::Ok | QMessageBox::Close);
         if (btn == QMessageBox::Ok) {
             if (conFlag) {
                 errFlag = 1;
+                emit sendInfo(1);
                 timer->start(1000);
-                while (!dia->exec());
+                dia->exec();
             }
         } else {
             this->close();
@@ -601,13 +601,28 @@ void Widget::connectError(QAbstractSocket::SocketError err)
 void Widget::reconnect()
 {
     count++;
+    if (!errFlag) {
+        timer->stop();
+        return;
+    }
+
+    if (count > 3) {
+        timer->stop();
+        errFlag = 0;
+        if (dia->isVisible()) {
+            dia->accept();
+        }
+        appendSystemMessage("自动重连失败，请稍后重试。");
+        return;
+    }
+
+    emit sendInfo(count);
     socket->connectToHost(m_serverIP, m_serverPort);
 }
 
 void Widget::on_pushButton_clicked()
 {
     if (m_isThinking) {
-        m_isInterrupted = true;
         return;
     }
 
@@ -641,13 +656,15 @@ void Widget::on_pushButton_clicked()
     ui->lineEdit->clear();
 
     appendSystemMessage("思考中...");
-    ui->pushButton->setText("中断");
-    m_isThinking = true;
-    m_isInterrupted = false;
+    setThinkingState(true);
 }
 
 void Widget::on_voiceBtn_pressed()
 {
+    if (m_isThinking) {
+        return;
+    }
+
     isRecording = true;
     ui->voiceBtn->setText("🔴");
     ui->voiceLabel->setText("录制中...松开停止");
@@ -692,9 +709,7 @@ void Widget::on_voiceBtn_released()
         socket->flush();
 
         appendSystemMessage("思考中...");
-        ui->pushButton->setText("中断");
-        m_isThinking = true;
-        m_isInterrupted = false;
+        setThinkingState(true);
     } else {
         appendSystemMessage("识别失败");
     }
@@ -916,12 +931,20 @@ void Widget::setSocketHandlersActive(bool active)
     }
 }
 
+void Widget::setThinkingState(bool thinking)
+{
+    m_isThinking = thinking;
+    ui->pushButton->setEnabled(!thinking);
+    ui->lineEdit->setEnabled(!thinking);
+    ui->voiceBtn->setEnabled(!thinking);
+    ui->pushButton->setText(QStringLiteral("发送"));
+}
+
 void Widget::leaveChatScene(const std::function<void()> &afterCleanup)
 {
     timer->stop();
     historyTimer->stop();
-    m_isThinking = false;
-    m_isInterrupted = false;
+    setThinkingState(false);
     conFlag = 0;
     errFlag = 0;
 
@@ -983,7 +1006,7 @@ bool Widget::consumeFreeConsultQuota()
     }
 
     if (usedCount >= 5) {
-        QMessageBox::information(this, QStringLiteral("免费次数已用完"),
+        QMessageBox::information(nullptr, QStringLiteral("免费次数已用完"),
                                  QStringLiteral("非会员每天可免费问诊 5 次，请开通会员后继续使用。"));
         return false;
     }
@@ -1022,22 +1045,9 @@ void Widget::updateReadableContentFromHistory()
 
 void Widget::showThemedMessageBox(QMessageBox::Icon icon, const QString &title, const QString &text)
 {
-    QMessageBox box(this);
+    QMessageBox box(nullptr);
     box.setIcon(icon);
     box.setWindowTitle(title);
     box.setText(text);
-
-    const bool light = ThemeHelpers::isLightTheme(m_bgColor);
-    box.setStyleSheet(QString(
-        "QMessageBox { background: %1; }"
-        "QLabel { color: %2; min-width: 280px; font: 13px \"Microsoft YaHei\"; }"
-        "QPushButton { background: %3; color: %4; border: 1px solid %5; border-radius: 10px; padding: 6px 16px; min-width: 88px; }"
-        "QPushButton:hover { background: %6; }")
-                          .arg(light ? "#F5FBFF" : "#07111F",
-                               light ? "#0F2740" : "#EAFBFF",
-                               light ? "rgba(255,255,255,0.96)" : "rgba(6,24,45,0.92)",
-                               light ? "#0F2740" : "#D8F7FF",
-                               light ? "rgba(15,39,64,0.18)" : "rgba(0,229,255,0.62)",
-                               light ? "rgba(199,244,255,0.96)" : "rgba(0,229,255,0.18)"));
     box.exec();
 }

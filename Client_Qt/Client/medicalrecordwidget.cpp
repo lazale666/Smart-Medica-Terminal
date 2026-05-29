@@ -241,12 +241,12 @@ void MedicalRecordWidget::onAiFillBtnClicked()
 {
     const QString diseaseName = ui->diseaseEdit->text().trimmed();
     if (diseaseName.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先输入疾病名称。"));
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先输入疾病名称。"));
         return;
     }
 
     if (m_isAiThinking) {
-        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("AI 正在思考中，请稍候。"));
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("AI 正在思考中，请稍候。"));
         return;
     }
 
@@ -283,17 +283,17 @@ void MedicalRecordWidget::onSaveBtnClicked()
     const QString treatment = ui->treatmentEdit->toPlainText().trimmed();
 
     if (diseaseName.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请输入疾病名称。"));
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请输入疾病名称。"));
         return;
     }
 
     if (treatment.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请填写治疗建议。"));
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请填写治疗建议。"));
         return;
     }
 
     saveRecord(diseaseName, diagnosisDate, treatment);
-    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("病例保存成功。"));
+    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("病例保存成功。"));
 
     ui->diseaseEdit->clear();
     ui->dateEdit->setDate(QDate::currentDate());
@@ -435,7 +435,7 @@ void MedicalRecordWidget::onSocketError(QAbstractSocket::SocketError error)
     ui->aiFillBtn->setEnabled(true);
     ui->saveBtn->setEnabled(true);
     ui->statusLabel->setText(QStringLiteral("状态：连接失败"));
-    QMessageBox::warning(this, QStringLiteral("错误"), QStringLiteral("无法连接到服务器：") + socket->errorString());
+    QMessageBox::warning(nullptr, QStringLiteral("错误"), QStringLiteral("无法连接到服务器：") + socket->errorString());
 }
 
 void MedicalRecordWidget::refreshRecordList()

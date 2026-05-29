@@ -344,11 +344,16 @@ void DoctorChatWidget::sendLoginRequest()
 bool DoctorChatWidget::sendMessage(const QString &sessionId, const QString &message)
 {
     if (socket->state() != QTcpSocket::ConnectedState) {
-        QMessageBox::warning(this, QStringLiteral("未连接服务器"), QStringLiteral("请先在设置中配置并连接服务器。"));
+        QMessageBox::warning(nullptr, QStringLiteral("未连接服务器"), QStringLiteral("请先在设置中配置并连接服务器。"));
         return false;
     }
     if (sessionId.trimmed().isEmpty() || !m_conversations.contains(sessionId)) {
-        QMessageBox::information(this, QStringLiteral("未选择患者"), QStringLiteral("请先从左侧列表选择一个患者会话。"));
+        QMessageBox::information(nullptr, QStringLiteral("未选择患者"), QStringLiteral("请先从左侧列表选择一个患者会话。"));
+        return false;
+    }
+
+    if (!m_conversations[sessionId].isOnline) {
+        QMessageBox::information(nullptr, QStringLiteral("患者已离线"), QStringLiteral("该患者已断开，请等待患者重新进入名师对话。"));
         return false;
     }
 
@@ -478,24 +483,38 @@ void DoctorChatWidget::ensureConversationExists(const QString &sessionId, const 
         return;
     }
 
-    QString matchedSessionId = sessionId;
+    QString matchedSessionId;
     for (auto it = m_conversations.begin(); it != m_conversations.end(); ++it) {
-        if (it->clientName == clientName) {
+        if (it->clientName == clientName && it.key() != sessionId) {
             matchedSessionId = it.key();
             break;
         }
     }
 
-    if (!m_conversations.contains(matchedSessionId)) {
+    if (!matchedSessionId.isEmpty()) {
+        DoctorConversationState state = m_conversations.take(matchedSessionId);
+        state.sessionId = sessionId;
+        if (m_activeConversationSessionId == matchedSessionId) {
+            m_activeConversationSessionId = sessionId;
+        }
+        if (!m_conversations.contains(sessionId)) {
+            m_conversations.insert(sessionId, state);
+        }
+    }
+
+    if (!m_conversations.contains(sessionId)) {
         DoctorConversationState state;
-        state.sessionId = matchedSessionId;
+        state.sessionId = sessionId;
         state.clientName = clientName;
         state.historyFile = startHistorySession(clientName);
         state.historyStarted = true;
-        m_conversations.insert(matchedSessionId, state);
+        state.isOnline = true;
+        m_conversations.insert(sessionId, state);
     } else {
-        DoctorConversationState &state = m_conversations[matchedSessionId];
+        DoctorConversationState &state = m_conversations[sessionId];
+        state.sessionId = sessionId;
         state.clientName = clientName;
+        state.isOnline = true;
         if (!state.historyStarted) {
             state.historyFile = startHistorySession(clientName);
             state.historyStarted = true;
@@ -510,8 +529,8 @@ void DoctorChatWidget::switchToConversation(const QString &sessionId)
     }
 
     m_activeConversationSessionId = sessionId;
-    m_hasActiveClient = true;
     DoctorConversationState &state = m_conversations[sessionId];
+    m_hasActiveClient = state.isOnline;
     state.unreadCount = 0;
     m_messages = state.messages;
     updateCurrentClientLabel(displayNameForClient(state.clientName));
@@ -681,23 +700,15 @@ void DoctorChatWidget::readData()
                 sessionId = clientName;
             }
 
-            QString existingId = sessionId;
-            for (auto it = m_conversations.begin(); it != m_conversations.end(); ++it) {
-                if (it->clientName == clientName) {
-                    existingId = it.key();
-                    break;
-                }
-            }
-
-            ensureConversationExists(existingId, clientName);
-            DoctorConversationState &state = m_conversations[existingId];
+            ensureConversationExists(sessionId, clientName);
+            DoctorConversationState &state = m_conversations[sessionId];
             state.messages.append({QString(), QStringLiteral("患者 %1 已连接").arg(clientName), false, true});
             state.lastPreview = QStringLiteral("患者已连接");
             appendHistoryMessage(state.historyFile, QStringLiteral("system"), QString(), QStringLiteral("患者 %1 已连接").arg(clientName));
 
             if (m_activeConversationSessionId.isEmpty()) {
-                switchToConversation(existingId);
-            } else if (m_activeConversationSessionId != existingId) {
+                switchToConversation(sessionId);
+            } else if (m_activeConversationSessionId != sessionId) {
                 state.unreadCount += 1;
                 updateSessionList();
             } else {
@@ -716,23 +727,15 @@ void DoctorChatWidget::readData()
                 sessionId = clientName;
             }
 
-            QString existingId = sessionId;
-            for (auto it = m_conversations.begin(); it != m_conversations.end(); ++it) {
-                if (it->clientName == clientName) {
-                    existingId = it.key();
-                    break;
-                }
-            }
-
-            ensureConversationExists(existingId, clientName);
-            DoctorConversationState &state = m_conversations[existingId];
+            ensureConversationExists(sessionId, clientName);
+            DoctorConversationState &state = m_conversations[sessionId];
             const QString message = obj.value("message").toString();
             state.messages.append({displayNameForClient(clientName), message, false, false});
             state.lastPreview = message;
             appendHistoryMessage(state.historyFile, QStringLiteral("client"), clientName, message);
 
-            if (m_activeConversationSessionId == existingId || m_activeConversationSessionId.isEmpty()) {
-                switchToConversation(existingId);
+            if (m_activeConversationSessionId == sessionId || m_activeConversationSessionId.isEmpty()) {
+                switchToConversation(sessionId);
             } else {
                 state.unreadCount += 1;
                 updateSessionList();
@@ -744,15 +747,17 @@ void DoctorChatWidget::readData()
                 clientName = obj.value("username").toString();
             }
 
-            QString sessionId;
-            for (auto it = m_conversations.begin(); it != m_conversations.end(); ++it) {
-                if (it->clientName == clientName) {
-                    sessionId = it.key();
-                    break;
+            QString sessionId = obj.value("session_id").toString();
+            if (sessionId.isEmpty()) {
+                for (auto it = m_conversations.begin(); it != m_conversations.end(); ++it) {
+                    if (it->clientName == clientName) {
+                        sessionId = it.key();
+                        break;
+                    }
                 }
             }
             if (sessionId.isEmpty()) {
-                sessionId = obj.value("session_id").toString(clientName);
+                sessionId = clientName;
             }
             if (!m_conversations.contains(sessionId)) {
                 continue;
@@ -762,9 +767,11 @@ void DoctorChatWidget::readData()
             state.messages.append({QString(), QStringLiteral("患者 %1 已断开").arg(clientName), false, true});
             state.lastPreview = QStringLiteral("患者已断开");
             appendHistoryMessage(state.historyFile, QStringLiteral("system"), QString(), QStringLiteral("患者 %1 已断开").arg(clientName));
+            state.isOnline = false;
             endHistorySession(sessionId, true);
 
             if (m_activeConversationSessionId == sessionId) {
+                m_hasActiveClient = false;
                 m_messages = state.messages;
                 rebuildMessages();
             } else {

@@ -206,7 +206,8 @@ void DoctorListWidget::readData()
 
             disconnect(socket, &QTcpSocket::readyRead, this, &DoctorListWidget::readData);
             const QString doctorName = obj.value("doctor_name").toString(QStringLiteral("医生"));
-            m_activeDialog = new DoctorDialog(socket, m_username, doctorName, this);
+            const QString sessionId = obj.value("session_id").toString();
+            m_activeDialog = new DoctorDialog(socket, m_username, doctorName, sessionId, this);
             m_activeDialog->applyAppearance(m_currentMode, m_bgColor, m_fontColor);
             m_activeDialog->setAttribute(Qt::WA_DeleteOnClose);
             m_activeDialog->show();

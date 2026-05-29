@@ -3,15 +3,11 @@
 #include "resourcepaths.h"
 #include "themehelpers.h"
 
-#include <QDialog>
 #include <QFile>
 #include <QJsonDocument>
-#include <QLabel>
 #include <QPalette>
 #include <QPixmap>
-#include <QPushButton>
 #include <QResizeEvent>
-#include <QVBoxLayout>
 
 LoginWidget::LoginWidget(QWidget *parent)
     : QWidget(parent)
@@ -142,38 +138,17 @@ bool LoginWidget::registerUser(const QString &username, const QString &password)
 
 void LoginWidget::showDisclaimerDialog()
 {
-    QDialog dialog(this);
-    dialog.setWindowTitle(QStringLiteral("免责声明"));
-    dialog.setModal(true);
-
-    QVBoxLayout *layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(18, 18, 18, 18);
-    layout->setSpacing(12);
-
-    QLabel *imageLabel = new QLabel(&dialog);
-    imageLabel->setAlignment(Qt::AlignCenter);
-    const QString imagePath = ResourcePaths::findPhoto("dontganmao.png");
-    QPixmap pixmap(imagePath);
+    QMessageBox box(nullptr);
+    box.setWindowTitle(QStringLiteral("免责声明"));
+    const QPixmap pixmap(ResourcePaths::findPhoto("dontganmao.png"));
     if (!pixmap.isNull()) {
-        imageLabel->setPixmap(pixmap.scaled(320, 240, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        box.setIconPixmap(pixmap.scaled(320, 240, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    } else {
+        box.setIcon(QMessageBox::Information);
     }
-
-    QLabel *textLabel = new QLabel(QStringLiteral("本程序仅供娱乐，不作为医学参考价值。"), &dialog);
-    textLabel->setAlignment(Qt::AlignCenter);
-    textLabel->setWordWrap(true);
-
-    QLabel *footerLabel = new QLabel(QStringLiteral("另外，别感冒"), &dialog);
-    footerLabel->setAlignment(Qt::AlignCenter);
-
-    QPushButton *okBtn = new QPushButton(QStringLiteral("确定"), &dialog);
-    okBtn->setFixedWidth(120);
-    connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
-
-    layout->addWidget(imageLabel);
-    layout->addWidget(textLabel);
-    layout->addWidget(footerLabel);
-    layout->addWidget(okBtn, 0, Qt::AlignHCenter);
-    dialog.exec();
+    box.setText(QStringLiteral("本程序仅供娱乐，不作为医学参考依据。\n另外，别感冒"));
+    box.setStandardButtons(QMessageBox::Ok);
+    box.exec();
 }
 
 void LoginWidget::on_loginBtn_clicked()

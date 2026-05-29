@@ -444,7 +444,7 @@ void SettingsWidget::onSaveUserInfoBtnClicked()
     m_settings->setValue(userScopedKey(QStringLiteral("gender")), ui->genderCombo->currentText());
     m_settings->setValue(userScopedKey(QStringLiteral("age")), ui->ageSpinBox->value());
     m_settings->sync();
-    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("用户信息已保存。"));
+    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("用户信息已保存。"));
 }
 
 void SettingsWidget::loadChatRecords()
@@ -528,7 +528,7 @@ void SettingsWidget::onSaveServerBtnClicked()
 {
     saveSettings();
     emit serverConfigChanged(ui->ipEdit->text(), ui->portEdit->text().toUInt(), ui->autoConnectCheck->isChecked());
-    QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
+    QMessageBox::information(nullptr, QStringLiteral("提示"), QStringLiteral("服务器配置已保存。"));
 }
 
 void SettingsWidget::onCloseBtnClicked()
@@ -587,7 +587,7 @@ void SettingsWidget::onDeleteChatClicked()
 {
     const QList<QListWidgetItem*> selectedItems = ui->chatRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先选择要删除的聊天记录。"));
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先选择要删除的聊天记录。"));
         return;
     }
 
@@ -602,7 +602,7 @@ void SettingsWidget::onDeleteChatClicked()
     }
 
     loadChatRecords();
-    QMessageBox::information(this, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条聊天记录。").arg(deletedCount));
+    QMessageBox::information(nullptr, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条聊天记录。").arg(deletedCount));
     emit cacheCleared();
 }
 
@@ -617,7 +617,7 @@ void SettingsWidget::onDeleteMedicalClicked()
 {
     const QList<QListWidgetItem*> selectedItems = ui->medicalRecordList->selectedItems();
     if (selectedItems.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先选择要删除的病例记录。"));
+        QMessageBox::warning(nullptr, QStringLiteral("提示"), QStringLiteral("请先选择要删除的病例记录。"));
         return;
     }
 
@@ -632,7 +632,7 @@ void SettingsWidget::onDeleteMedicalClicked()
         }
     }
 
-    QMessageBox::information(this, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条病例记录。").arg(deletedCount));
+    QMessageBox::information(nullptr, QStringLiteral("删除成功"), QStringLiteral("成功删除 %1 条病例记录。").arg(deletedCount));
 }
 
 void SettingsWidget::onVolumeSliderChanged(int value)

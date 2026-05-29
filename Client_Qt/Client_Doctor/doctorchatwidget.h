@@ -41,6 +41,7 @@ struct DoctorConversationState
     QString historyFile;
     int unreadCount = 0;
     bool historyStarted = false;
+    bool isOnline = false;
     QString lastPreview;
 };
 

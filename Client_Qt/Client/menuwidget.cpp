@@ -371,5 +371,5 @@ void MenuWidget::refreshMemberAccessState()
 
 void MenuWidget::showMemberRequiredMessage()
 {
-    QMessageBox::information(this, QStringLiteral("会员功能"), QStringLiteral("请先开通会员后再使用该功能。"));
+    QMessageBox::information(nullptr, QStringLiteral("会员功能"), QStringLiteral("请先开通会员后再使用该功能。"));
 }

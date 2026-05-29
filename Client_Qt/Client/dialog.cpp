@@ -1,4 +1,4 @@
-#include "dialog.h"
+﻿#include "dialog.h"
 #include "ui_dialog.h"
 #include "themehelpers.h"
 
@@ -33,8 +33,8 @@ void Dialog::applyAppearance(const QString &bgColor, const QString &fontColor)
 
 void Dialog::reConnectInfo(int count)
 {
-    ui->label->setText(QStringLiteral("自动重连 %1 次，失败 %2 次").arg(count).arg(count - 1));
-    if (count == 10) {
+    ui->label->setText(QStringLiteral("自动重连中（第 %1/3 次）").arg(count));
+    if (count >= 3) {
         accept();
     }
 }

@@ -149,6 +149,9 @@ static QString appThemeStyleSheet(const QString &bgColor, const QString &fontCol
             border-radius: 9px;
             background: %14;
         }
+        QMessageBox, QMessageBox * {
+            color: #000000;
+        }
     )")
         .arg(fontColor, buttonBg, borderColor, buttonHover, buttonPressed,
              buttonCheckedText, inputBg, inputText, selectionBg, selectionText,

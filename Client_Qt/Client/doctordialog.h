@@ -29,7 +29,8 @@ class DoctorDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit DoctorDialog(QTcpSocket *socket, const QString &username, const QString &doctorName, QWidget *parent = nullptr);
+    explicit DoctorDialog(QTcpSocket *socket, const QString &username, const QString &doctorName,
+                          const QString &sessionId, QWidget *parent = nullptr);
     ~DoctorDialog();
     void applyAppearance(const QString &mode, const QString &bgColor, const QString &fontColor);
     void applyModeSettings(const QString &mode);
@@ -48,6 +49,7 @@ private:
     QTcpSocket *m_socket;
     QString m_username;
     QString m_doctorName;
+    QString m_sessionId;
     QString m_currentMode;
     QString m_bgColor;
     QString m_fontColor;
